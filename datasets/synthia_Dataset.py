@@ -12,7 +12,7 @@ import imageio
 
 from datasets.cityscapes_Dataset import City_Dataset, City_DataLoader
 
-imageio.plugins.freeimage.download()
+# imageio.plugins.freeimage.download()  # cannot download this inside the cloud
 
 class SYNTHIA_Dataset(City_Dataset):
     def __init__(self,

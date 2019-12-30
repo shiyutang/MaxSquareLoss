@@ -60,7 +60,7 @@ class GTA5_Dataset(City_Dataset):
         print("{} num images in GTA5 {} set have been loaded.".format(len(self.items), self.split))
 
     def __getitem__(self, item):
-        id = int(self.items[item])
+        id = int(self.items[item][-9:-4])
 
         image_path = os.path.join(self.image_filepath, "{:0>5d}.png".format(id))
         image = Image.open(image_path).convert("RGB")

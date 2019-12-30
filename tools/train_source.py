@@ -24,15 +24,15 @@ from datasets.synthia_Dataset import SYNTHIA_DataLoader
 
 
 datasets_path={
-    'cityscapes': {'data_root_path': './datasets/Cityscapes', 'list_path': './datasets/city_list', 
-                    'image_path':'./datasets/Cityscapes/leftImg8bit',
-                    'gt_path': './datasets/Cityscapes/gtFine'},
-    'gta5': {'data_root_path': './datasets/GTA5', 'list_path': './datasets/GTA5/list',
-                    'image_path':'./datasets/GTA5/images',
-                    'gt_path': './datasets/GTA5/labels'},
-    'synthia': {'data_root_path': './datasets/SYNTHIA', 'list_path': './datasets/SYNTHIA/list',
-                    'image_path':'./datasets/SYNTHIA/RGB',
-                    'gt_path': './datasets/SYNTHIA/GT/LABELS'},
+    'cityscapes': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes', 'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
+                    'image_path':'/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
+                    'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
+    'gta5': {'data_root_path': '/data/Projects/ADVENT/data/GTA5', 'list_path': '/data/Projects/ADVENT/data/GTA5',
+                    'image_path':'/data/Projects/ADVENT/data/GTA5/images',
+                    'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
+    'synthia': {'data_root_path': '/data/Projects/ADVENT/data/SYNTHIA', 'list_path': '/data/Projects/ADVENT/data/SYNTHIA/list',
+                    'image_path':'/data/Projects/ADVENT/data/SYNTHIA/RGB',
+                    'gt_path': '/data/Projects/ADVENT/data/GT/LABELS'},
     'NTHU': {'data_root_path': './datasets/NTHU_Datasets', 'list_path': './datasets/NTHU_list'}
     }
 
@@ -49,7 +49,8 @@ ITER_MAX = 5000
 class Trainer():
     def __init__(self, args, cuda=None, train_id="None", logger=None):
         self.args = args
-        os.environ["CUDA_VISIBLE_DEVICES"] = self.args.gpu
+        if torch.cuda.device_count()==1:
+            os.environ["CUDA_VISIBLE_DEVICES"] = self.args.gpu
         self.cuda = cuda and torch.cuda.is_available()
         self.device = torch.device('cuda' if self.cuda else 'cpu')
         self.train_id = train_id
@@ -63,7 +64,7 @@ class Trainer():
         self.second_best_MIou = 0
 
         # set TensorboardX
-        self.writer = SummaryWriter(self.args.checkpoint_dir)
+        self.writer = SummaryWriter(self.args.save_dir)
 
         # Metric definition
         self.Eval = Eval(self.args.num_classes)
@@ -74,7 +75,12 @@ class Trainer():
 
         # model
         self.model, params = get_model(self.args)
-        self.model = nn.DataParallel(self.model, device_ids=[0])
+        if torch.cuda.device_count()>1:
+            print("let us use {} GPUs".format(torch.cuda.device_count()))
+            self.model = nn.DataParallel(self.model)
+        elif torch.cuda.device_count()==1:
+            self.model = nn.DataParallel(self.model, device_ids=[0])
+
         self.model.to(self.device)
 
         if self.args.optim == "SGD":
@@ -87,7 +93,7 @@ class Trainer():
             self.optimizer = torch.optim.Adam(params, betas=(0.9, 0.99), weight_decay=self.args.weight_decay)
         # dataloader
         if self.args.dataset=="cityscapes":
-            self.dataloader = City_DataLoader(self.args)  
+            self.dataloader = City_DataLoader(self.args)
         elif self.args.dataset=="gta5":
             self.dataloader = GTA5_DataLoader(self.args)
         else:
@@ -103,12 +109,12 @@ class Trainer():
         for key, val in vars(self.args).items():
             self.logger.info("{:16} {}".format(key, val))
 
-        # choose cuda
-        if self.cuda:
-            current_device = torch.cuda.current_device()
-            self.logger.info("This model will run on {}".format(torch.cuda.get_device_name(current_device)))
-        else:
-            self.logger.info("This model will run on CPU")
+        # # choose cuda
+        # if self.cuda:
+        #     current_device = torch.cuda.current_device()
+        #     self.logger.info("This model will run on {}".format(torch.cuda.get_device_name(current_device)))
+        # else:
+        #     self.logger.info("This model will run on CPU")
 
         # load pretrained checkpoint
         if self.args.pretrained_ckpt_file is not None:
@@ -162,14 +168,14 @@ class Trainer():
             'best_MIou': self.current_MIoU
         }
         self.logger.info("=>best_MIou {} at {}".format(self.best_MIou, self.best_iter))
-        self.logger.info("=>saving the final checkpoint to " + os.path.join(self.args.checkpoint_dir, self.train_id+'final.pth'))
+        self.logger.info("=>saving the final checkpoint to " + os.path.join(self.args.save_dir, self.train_id+'final.pth'))
         self.save_checkpoint(self.train_id+'final.pth')
 
     def train_one_epoch(self):
         tqdm_epoch = tqdm(self.dataloader.data_loader, total=self.dataloader.num_iterations,
                           desc="Train Epoch-{}-total-{}".format(self.current_epoch+1, self.epoch_num))
         self.logger.info("Training one epoch...")
-        self.Eval.reset()
+        self.Eval.reset()  # set confusion matrix to zeros
 
         train_loss = []
         loss_seg_value_2 = 0
@@ -470,7 +476,7 @@ class Trainer():
         :param filepath:
         :return:
         """
-        filename = os.path.join(self.args.checkpoint_dir, filename)
+        filename = os.path.join(self.args.save_dir, filename)
         state = {
             'epoch': self.current_epoch + 1,
             'iteration': self.current_iter,
@@ -514,6 +520,8 @@ def add_train_args(arg_parser):
                             help="the root path of dataset")
     arg_parser.add_argument('--checkpoint_dir', default="./log/train",
                             help="the path of ckpt file")
+    arg_parser.add_argument("--save_dir",default="./log/train",
+                            help="the path that you want to save all the output")
 
     # Model related arguments
     arg_parser.add_argument('--backbone', default='deeplabv2_multi',
@@ -534,8 +542,12 @@ def add_train_args(arg_parser):
                             help='random seed')
     arg_parser.add_argument('--gpu', type=str, default="0",
                             help=" the num of gpu")
-    arg_parser.add_argument('--batch_size_per_gpu', default=1, type=int,
-                            help='input batch size')
+    # arg_parser.add_argument('--batch_size_per_gpu', default=1, type=int,
+    #                         help='input batch size per gpu')
+    arg_parser.add_argument("--batch_size",default=1,type=int,
+                            help="directly set batch size")
+    arg_parser.add_argument("--exp_tag",type=str,default="test",
+                            help="Set tag for each experiment")
 
     # dataset related arguments
     arg_parser.add_argument('--dataset', default='cityscapes', type=str,
@@ -578,9 +590,9 @@ def add_train_args(arg_parser):
 
     arg_parser.add_argument('--lr', type=float, default=2.5e-4,
                             help="init learning rate ")
-    arg_parser.add_argument('--iter_max', type=int, default=250000,
+    arg_parser.add_argument('--iter_max', type=int, default=200000,
                             help="the maxinum of iteration")
-    arg_parser.add_argument('--iter_stop', type=int, default=None,
+    arg_parser.add_argument('--iter_stop', type=int, default=80000,
                             help="the early stop step")
     arg_parser.add_argument('--poly_power', type=float, default=0.9,
                             help="poly_power")
@@ -594,10 +606,13 @@ def add_train_args(arg_parser):
     return arg_parser
 
 def init_args(args):
-    args.batch_size = args.batch_size_per_gpu * ceil(len(args.gpu) / 2)
+    if torch.cuda.device_count()==1:
+        args.batch_size = 1
+
     print("batch size: ", args.batch_size)
 
-    train_id = str(args.dataset)
+    # train_id = str(args.dataset)
+    train_id = args.exp_tag
 
     crop_size = args.crop_size.split(',')
     base_size = args.base_size.split(',')
@@ -617,12 +632,12 @@ def init_args(args):
         args.target_crop_size = (int(target_crop_size[0]), int(target_crop_size[1]))
         args.target_base_size = (int(target_base_size[0]), int(target_base_size[1]))
 
-    if not args.continue_training:
-        if os.path.exists(args.checkpoint_dir):
-            print("checkpoint dir exists, which will be removed")
-            import shutil
-            shutil.rmtree(args.checkpoint_dir, ignore_errors=True)
-        os.mkdir(args.checkpoint_dir)
+    # if not args.continue_training:
+        # if os.path.exists(args.checkpoint_dir):
+        #     print("checkpoint dir exists, which will be removed")
+        #     import shutil
+        #     shutil.rmtree(args.checkpoint_dir, ignore_errors=True)
+        # os.mkdir(args.checkpoint_dir)
 
     if args.data_root_path is None:
         args.data_root_path = datasets_path[args.dataset]['data_root_path']
@@ -636,7 +651,7 @@ def init_args(args):
     # logger configure
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
-    fh = logging.FileHandler(os.path.join(args.checkpoint_dir, 'train_log.txt'))
+    fh = logging.FileHandler(os.path.join(args.save_dir, train_id+'train_log.txt'))
     ch = logging.StreamHandler()
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     fh.setFormatter(formatter)
