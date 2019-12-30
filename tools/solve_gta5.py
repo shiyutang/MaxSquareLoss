@@ -166,11 +166,11 @@ class UDATrainer(Trainer):
             print("\n############## Begin {}/{} Round! #################\n".format(self.current_round+1, self.round_num))
             print("epoch_each_round:", self.args.epoch_each_round)
             
-            self.epoch_num = (self.current_round+1)*self.args.epoch_each_round
+            self.epoch_num = self.current_epoch+(self.current_round+1)*self.args.epoch_each_round
 
             # generate threshold
             self.threshold = self.args.threshold
-
+            print("self.epoch_num",self.epoch_num)
             # self.train(self.train_one_epoch_DA())
             self.train()
 

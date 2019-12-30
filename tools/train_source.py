@@ -497,7 +497,7 @@ class Trainer():
             self.optimizer.load_state_dict(checkpoint["optimizer"])
             self.current_epoch = checkpoint["epoch"]
             self.current_iter = checkpoint["iteration"]
-            self.best_MIou = checkpoint["best_MIOU"]
+            self.best_MIou = checkpoint["best_MIou"]
             #todo: check if optimizer,current epoch, current_iter best_MIou will be replaced or in the way of sth
 
         except OSError as e:
