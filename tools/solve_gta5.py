@@ -134,10 +134,6 @@ class UDATrainer(Trainer):
         for key, val in vars(self.args).items():
             self.logger.info("{:16} {}".format(key, val))
 
-        # choose cuda
-        current_device = torch.cuda.current_device()
-        self.logger.info("This model will run on {}".format(torch.cuda.get_device_name(current_device)))
-
         # load pretrained checkpoint
         if self.args.pretrained_ckpt_file is not None:
             if os.path.isdir(self.args.pretrained_ckpt_file):
@@ -151,9 +147,11 @@ class UDATrainer(Trainer):
             self.current_epoch = 0
 
         if self.args.continue_training:
-            self.load_checkpoint(os.path.join(self.args.checkpoint_dir, self.train_id + 'final.pth'))
+            self.load_checkpoint(os.path.join(self.args.checkpoint_dir, self.train_id + 'best.pth'))
+            self.best_iter = self.current_iter         # the best iteration for target
+            self.best_source_iter = self.current_iter  # the best iteration for source
         
-        self.args.iter_max = self.dataloader.num_iterations*self.args.epoch_each_round*self.round_num
+        self.args.iter_max = self.current_iter+self.dataloader.num_iterations*self.args.epoch_each_round*self.round_num
         print(self.args.iter_max, self.dataloader.num_iterations)
 
         # train
@@ -173,13 +171,16 @@ class UDATrainer(Trainer):
             # generate threshold
             self.threshold = self.args.threshold
 
+            # self.train(self.train_one_epoch_DA())
             self.train()
 
             self.current_round += 1
         
     def train_one_epoch(self):
-        tqdm_epoch = tqdm(zip(self.source_dataloader, self.target_dataloader), total=self.dataloader.num_iterations,
-                          desc="Train Round-{}-Epoch-{}-total-{}".format(self.current_round, self.current_epoch+1, self.epoch_num))
+        tqdm_epoch = tqdm(zip(self.source_dataloader, self.target_dataloader),
+                          total=self.dataloader.num_iterations,
+                          desc="Train Round-{}-Epoch-{}-total-{}".format(self.current_round,
+                                                      self.current_epoch+1, self.epoch_num))
         self.logger.info("Training one epoch...")
         self.Eval.reset()
         

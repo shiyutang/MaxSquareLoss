@@ -109,12 +109,6 @@ class Trainer():
         for key, val in vars(self.args).items():
             self.logger.info("{:16} {}".format(key, val))
 
-        # # choose cuda
-        # if self.cuda:
-        #     current_device = torch.cuda.current_device()
-        #     self.logger.info("This model will run on {}".format(torch.cuda.get_device_name(current_device)))
-        # else:
-        #     self.logger.info("This model will run on CPU")
 
         # load pretrained checkpoint
         if self.args.pretrained_ckpt_file is not None:
@@ -124,8 +118,8 @@ class Trainer():
         
         if self.args.continue_training:
             self.load_checkpoint(os.path.join(self.args.checkpoint_dir, self.train_id + 'best.pth'))
-            self.best_iter = self.current_iter
-            self.best_source_iter = self.current_iter
+            self.best_iter = self.current_iter         # the best iteration for target
+            self.best_source_iter = self.current_iter  # the best iteration for source
         else:
             self.current_epoch = 0
         # train
@@ -133,12 +127,15 @@ class Trainer():
 
         self.writer.close()
 
-    def train(self):
+    def train(self,train_method=None):
         # self.validate() # check image summary
 
         for epoch in tqdm(range(self.current_epoch, self.epoch_num),
                           desc="Total {} epochs".format(self.epoch_num)):
-            self.train_one_epoch()
+            if not train_method==None:
+                train_method()
+            else:
+                self.train_one_epoch()
 
             # validate
             PA, MPA, MIoU, FWIoU = self.validate()
@@ -496,6 +493,13 @@ class Trainer():
             else:
                 self.model.module.load_state_dict(checkpoint)
             self.logger.info("Checkpoint loaded successfully from "+filename)
+
+            self.optimizer.load_state_dict(checkpoint["optimizer"])
+            self.current_epoch = checkpoint["epoch"]
+            self.current_iter = checkpoint["iteration"]
+            self.best_MIou = checkpoint["best_MIOU"]
+            #todo: check if optimizer,current epoch, current_iter best_MIou will be replaced or in the way of sth
+
         except OSError as e:
             self.logger.info("No checkpoint exists from '{}'. Skipping...".format(self.args.checkpoint_dir))
             self.logger.info("**First time to train**")
