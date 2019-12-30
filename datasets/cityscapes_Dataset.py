@@ -78,9 +78,9 @@ class City_Dataset(data.Dataset):
         if not os.path.exists(item_list_filepath):
             raise Warning("split must be train/val/trainval")
 
-        self.image_filepath = os.path.join(self.data_path, "leftImg8bit")
+        # self.image_filepath = os.path.join(self.data_path, "leftImg8bit")
 
-        self.gt_filepath = os.path.join(self.data_path, "gtFine")
+        # self.gt_filepath = os.path.join(self.data_path, "gtFine")
 
         self.items = [id.strip() for id in open(item_list_filepath)]
 
@@ -122,15 +122,18 @@ class City_Dataset(data.Dataset):
 
     def __getitem__(self, item):
         id = self.items[item]
-        filename = id.split("train_")[-1].split("val_")[-1].split("test_")[-1]
-        image_filepath = os.path.join(self.image_filepath, id.split("_")[0], id.split("_")[1])
-        image_filename = filename + "_leftImg8bit.png"
-        image_path = os.path.join(image_filepath, image_filename)
+        # filename = id.split("train_")[-1].split("val_")[-1].split("test_")[-1]
+        # image_filepath = os.path.join(self.image_filepath, id.split("_")[0], id.split("_")[1])
+        # image_filename = filename + "_leftImg8bit.png"
+        # image_path = os.path.join(image_filepath, image_filename)
+        image_path = os.path.join(self.data_path,id)
         image = Image.open(image_path).convert("RGB")
 
-        gt_filepath = os.path.join(self.gt_filepath, id.split("_")[0], id.split("_")[1])
-        gt_filename = filename + "_gtFine_labelIds.png"
-        gt_image_path = os.path.join(gt_filepath, gt_filename)
+        # gt_filepath = os.path.join(self.gt_filepath, id.split("_")[0], id.split("_")[1])
+        # gt_filename = filename + "_gtFine_labelIds.png"
+        # gt_image_path = os.path.join(gt_filepath, gt_filename)
+        gt_image_path = os.path.join(self.data_path,id.replace("leftImg8bit","gtFine",1)
+                                     .replace("leftImg8bit","gtFine_labelIds"))
         gt_image = Image.open(gt_image_path)
 
         if (self.split == "train" or self.split == "trainval") and self.training:
