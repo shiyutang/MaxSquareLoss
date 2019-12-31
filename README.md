@@ -98,44 +98,77 @@ We present several transfered results reported in our paper and provide the corr
 
 ### GTA5-to-Cityscapes:
 
-(Optional) Pretrain the model on the source domain (GTA5). 
+#### 1. (Optional) Pretrain the model on the source domain (GTA5). 
+
+
+```
+rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/train_source.py --gpu "0" --dataset 'gta5' --checkpoint_dir "./log/gta5_pretrain/" --iter_max 200000 --iter_stop 80000 --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --crop_size "1280,720"
+```
+
+Pretrain the multi-level model on the source domain (GTA5) by adding "--multi True". 
+
+```
+rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/train_source.py --gpu "0" --dataset 'gta5' --checkpoint_dir "./log/train/add_multi" --iter_max 200000 --iter_stop 80000 --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --crop_size "1280,720" --multi True
+```
 
 Otherwise, download the [checkpoint](https://drive.google.com/open?id=1KP37cQo_9NEBczm7pvq_zEmmosdhxvlF) pretrained on GTA5 in "Setup" section.
 
-```
-python3 tools/train_source.py --gpu "0" --dataset 'gta5' --checkpoint_dir "./log/gta5_pretrain/" --iter_max 200000 --iter_stop 80000 --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --crop_size "1280,720"
-```
+#### 2. train the model on source and target domain 
+Then in next step, set `--checkpoint_dir "./log/train" --restore_id GTA5_source` to load the GTA5_sourcebest.pth in ./log/train.
 
-Then in next step, set `--pretrained_ckpt_file "./log/gta5_pretrain/gta5final.pth"`.
+Or set the --checkpint_dir and restore_id to load  `"checkpoint_dir/restore_idbest.pth"` that trained by yourself.
+
+Also, remember to set the `--exp_tag` to mark output files and `--save_dir` as the directory you want to save your output.
 
 - MaxSquare
 
 
 ```
-python3 tools/solve_gta5.py --gpu "0" --backbone "deeplabv2_multi" --dataset 'cityscapes' --checkpoint_dir "./log/gta2city_AdaptSegNet_ST=0.1_maxsquare_round=5/" --pretrained_ckpt_file "./pretrained_model/GTA5_source.pth" --round_num 5 --target_mode "maxsquare" --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --lambda_target 0.1
+rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --gpu "0" --backbone "deeplabv2_multi" --dataset 'cityscapes' --exp_tag image_net_pretrain_MS_repeat --restore_id image_net_pretrain --checkpoint_dir "./log/train/image_net_pretrain_bs1_right_model_gta_only/image_net_pretrain"  --save_dir "./log/train/image_net_pretrain_bs1_right_model/MS_repeat"  --round_num 15 --target_mode "maxsquare" --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --lambda_target 0.1
 ```
 
 - MaxSquare+IW
 
 
 ```
-python3 tools/solve_gta5.py --gpu "0" --backbone "deeplabv2_multi" --dataset 'cityscapes' --checkpoint_dir "./log/gta2city_AdaptSegNet_ST=0.1_IW_maxsquare_round=5/" --pretrained_ckpt_file "./pretrained_model/GTA5_source.pth" --round_num 5 --target_mode "IW_maxsquare" --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --lambda_target 0.1 --IW_ratio 0.2
+rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --gpu "0" --backbone "deeplabv2_multi" --dataset 'cityscapes' --exp_tag image_net_pretrain_IW_MS_repeat --restore_id image_net_pretrain --checkpoint_dir "./log/train/image_net_pretrain_bs1_right_model_gta_only/image_net_pretrain" --save_dir "./log/train/image_net_pretrain_bs1_right_model/IW_MS_repeat" --round_num 15 --target_mode "IW_maxsquare" --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --lambda_target 0.1 --IW_ratio 0.2
+
+
 ```
 
 
-
-Pretrain the multi-level model on the source domain (GTA5) by adding "--multi True". 
+- MaxSquare+IW+Multi
 
 ```
-python3 tools/train_source.py --gpu "0" --dataset 'gta5' --checkpoint_dir "./log/gta5_pretrain_multi/" --iter_max 200000 --iter_stop 80000 --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --crop_size "1280,720" --multi True
+
+rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --gpu "0" --backbone "deeplabv2_multi" --dataset 'cityscapes' --exp IW_MS_repeat --restore_id add_multi --checkpoint_dir "./log/train/add_multi_gta_only" --save_dir "./log/train/multi_MS_IW_repeat"  --round_num 15 --target_mode "IW_maxsquare" --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --target_crop_size "1280,640" --lambda_target 0.09 --IW_ratio 0.2 --multi True --lambda_seg 0.1 --threshold 0.95
+
+```
+##### if your want to continue training 
+Set`"--continue_training True"` and change the init lr same as where it ends in `"--lr"`
+
+Remember that the `"--exp_tag"` and `"--save_dir"` needs to be the same as before to see continuous training curve in tensorboard 
+
+- MaxSquare
+
+```
+rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --gpu "0" --continue_training True --backbone "deeplabv2_multi" --dataset 'cityscapes' --exp_tag image_net_pretrain_MS --restore_id gta52cityscapes_maxsquare --checkpoint_dir "./log/train/image_net_pretrain_bs1_right_model/MS" --save_dir "./log/train/image_net_pretrain_bs1_right_model/MS"  --round_num 5 --target_mode "maxsquare" --freeze_bn False --weight_decay 5e-4 --lr 2.05e-7 --lambda_target 0.1
+```
+
+- MaxSquare+IW
+```
+rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --gpu "0" --continue_training True --backbone "deeplabv2_multi" --dataset 'cityscapes' --exp_tag image_net_pretrain_MS_IW  --restore_id gta52cityscapes_IW_maxsquare --checkpoint_dir "./log/train/image_net_pretrain_bs1_right_model/IW_MS"  --save_dir "./log/train/image_net_pretrain_bs1_right_model/IW_MS"  --round_num 10 --target_mode "IW_maxsquare" --freeze_bn False --weight_decay 5e-4 --lr 2.05e-7 --lambda_target 0.1 --IW_ratio 0.2
+
 ```
 
 - MaxSquare+IW+Multi
 
 ```
-python3 tools/solve_gta5.py --gpu "0" --backbone "deeplabv2_multi" --dataset 'cityscapes' --checkpoint_dir "./log/gta2city_AdaptSegNet_ST=0.09_IW_maxsquare_multi_round=5/" --pretrained_ckpt_file "./log/gta5_pretrain_multi/gta5best.pth" --round_num 5 --target_mode "IW_maxsquare" --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --target_crop_size "1280,640" --lambda_target 0.09 --IW_ratio 0.2 --multi True --lambda_seg 0.1 --threshold 0.95
+rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --gpu "0" --continue_training True --backbone "deeplabv2_multi" --dataset 'cityscapes' --exp_tag image_net_pretrain_MS_IW_Multi --restore_id gta52cityscapes_IW_maxsquare --checkpoint_dir "./log/train/multi_MS_IW"  --save_dir "./log/train/multi_MS_IW" --round_num 5 --target_mode "IW_maxsquare" --freeze_bn False --weight_decay 5e-4 --lr 2.05e-7 --target_crop_size "1280,640" --lambda_target 0.09 --IW_ratio 0.2 --multi True --lambda_seg 0.1 --threshold 0.95
+
 ```
 
+##### 3.evaluation
 Eval:
 
 ```
@@ -145,7 +178,7 @@ python3 tools/evaluate.py --gpu "0" --dataset 'cityscapes' --checkpoint_dir "./l
 To have a look at predicted examples, run tensorboard as follows:
 
 ```
-tensorboard --logdir=./log/eval_city  --port=6009
+sudo tensorboard --logdir=./log/train 
 ```
 
 

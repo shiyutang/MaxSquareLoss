@@ -36,7 +36,7 @@ class Evaluater():
         self.logger = logger
 
         # set TensorboardX
-        self.writer = SummaryWriter(self.args.checkpoint_dir)
+        self.writer = SummaryWriter(self.args.save_dir)
 
         # Metric definition
         self.Eval = Eval(self.args.num_classes)

@@ -137,7 +137,7 @@ class UDATrainer(Trainer):
         # load pretrained checkpoint
         if self.args.pretrained_ckpt_file is not None:
             if os.path.isdir(self.args.pretrained_ckpt_file):
-                self.args.pretrained_ckpt_file = os.path.join(self.args.checkpoint_dir, self.train_id + 'final.pth')
+                self.args.pretrained_ckpt_file = os.path.join(self.args.checkpoint_dir, self.restore_id + 'best.pth')
             self.load_checkpoint(self.args.pretrained_ckpt_file)
         
         if not self.args.continue_training:
@@ -147,7 +147,7 @@ class UDATrainer(Trainer):
             self.current_epoch = 0
 
         if self.args.continue_training:
-            self.load_checkpoint(os.path.join(self.args.checkpoint_dir, self.train_id + 'best.pth'))
+            self.load_checkpoint(os.path.join(self.args.checkpoint_dir, self.restore_id + 'final.pth'))
             self.best_iter = self.current_iter         # the best iteration for target
             self.best_source_iter = self.current_iter  # the best iteration for source
         
@@ -172,6 +172,7 @@ class UDATrainer(Trainer):
             self.threshold = self.args.threshold
             print("self.epoch_num",self.epoch_num)
             # self.train(self.train_one_epoch_DA())
+            #todo check self.train(self.train_one_epoch_DA())
             self.train()
 
             self.current_round += 1
