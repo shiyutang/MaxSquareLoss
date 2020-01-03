@@ -527,7 +527,7 @@ def add_train_args(arg_parser):
                             help="the path of ckpt file")
     arg_parser.add_argument("--save_dir",default="./log/train",
                             help="the path that you want to save all the output")
-    arg_parser.add_argument("--restore_id",typr=str, default="add_multi",
+    arg_parser.add_argument("--restore_id",type=str, default="add_multi",
                             help="the id that help find load model")
 
     # Model related arguments
@@ -569,7 +569,7 @@ def add_train_args(arg_parser):
                             help='base size of target image')
     arg_parser.add_argument('--num_classes', default=19, type=int,
                             help='num class of mask')
-    arg_parser.add_argument('--data_loader_workers', default=16, type=int,
+    arg_parser.add_argument('--data_loader_workers', default=4, type=int,
                             help='num_workers of Dataloader')
     arg_parser.add_argument('--pin_memory', default=2, type=int,
                             help='pin_memory of Dataloader')

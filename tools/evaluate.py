@@ -14,7 +14,6 @@ from torchvision.utils import make_grid
 
 import sys
 sys.path.append(os.path.abspath('.'))
-from utils.eval import Eval, inspect_decode_labels, softmax
 from datasets.cityscapes_Dataset import City_DataLoader, inv_preprocess, decode_labels, name_classes
 from datasets.gta5_Dataset import GTA5_DataLoader
 from datasets.crosscity_Dataset import CrossCity_Dataset
@@ -36,7 +35,7 @@ class Evaluater():
         self.logger = logger
 
         # set TensorboardX
-        self.writer = SummaryWriter(self.args.save_dir)
+        self.writer = SummaryWriter(self.args.checkpoint_dir)
 
         # Metric definition
         self.Eval = Eval(self.args.num_classes)
@@ -54,15 +53,16 @@ class Evaluater():
         if self.args.pretrained_ckpt_file is not None:
             path1 = os.path.join(*self.args.checkpoint_dir.split('/')[:-1], self.train_id + 'best.pth')
             path2 = self.args.pretrained_ckpt_file
-            if os.path.exists(path1):
-                pretrained_ckpt_file = path1
-            elif os.path.exists(path2):
+            if os.path.exists(path2):
                 pretrained_ckpt_file = path2
+            elif os.path.exists(path1):
+                pretrained_ckpt_file = path1
             else:
                 raise AssertionError("no pretrained_ckpt_file")
             self.load_checkpoint(pretrained_ckpt_file)
 
         # dataloader
+        # print("args.data_root_path",args.data_root_path,self.args.list_path)
         self.dataloader = City_DataLoader(self.args) if self.args.dataset=="cityscapes" else GTA5_DataLoader(self.args)
         if self.args.city_name != "None":
             target_data_set = CrossCity_Dataset(self.args, 
@@ -156,6 +156,7 @@ class Evaluater():
                         self.writer.add_image('eval/'+ str(index)+'/Images', img, self.current_epoch)
                         self.writer.add_image('eval/'+ str(index)+'/Labels', lab, self.current_epoch)
                         self.writer.add_image('eval/'+ str(index)+'/preds', color_pred, self.current_epoch)
+
             #show val result on tensorboard
             if self.args.image_summary:
                 images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images, numpy_transform=self.args.numpy_transform)
@@ -166,8 +167,9 @@ class Evaluater():
                     self.writer.add_image('a'+str(index)+'/Labels', lab, self.current_epoch)
                     self.writer.add_image('a'+str(index)+'/preds', color_pred, self.current_epoch)
                     if self.args.multi:
-                        self.writer.add_image('a'+ str(index)+'/preds_2', preds_colors_2[index], self.current_epoch)
-                        self.writer.add_image('a'+ str(index)+'/preds_c', preds_colors_c[index], self.current_epoch)
+                        self.writer.add_image('a'+ str(index)+'/preds_2', pred_2[index], self.current_epoch)
+                        self.writer.add_image('a'+ str(index)+'/preds_c', pred_c[index], self.current_epoch)
+
             # get eval result
             if self.args.class_16:
                 def val_info(Eval, name):

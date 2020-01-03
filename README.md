@@ -124,25 +124,21 @@ Also, remember to set the `--exp_tag` to mark output files and `--save_dir` as t
 
 
 ```
-rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --gpu "0" --backbone "deeplabv2_multi" --dataset 'cityscapes' --exp_tag image_net_pretrain_MS_repeat --restore_id image_net_pretrain --checkpoint_dir "./log/train/image_net_pretrain_bs1_right_model_gta_only/image_net_pretrain"  --save_dir "./log/train/image_net_pretrain_bs1_right_model/MS_repeat"  --round_num 15 --target_mode "maxsquare" --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --lambda_target 0.1
+rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --gpu "0" --backbone "deeplabv2_multi" --dataset 'cityscapes' --exp_tag image_net_pretrain_MS_repeat --restore_id image_net_pretrain --checkpoint_dir "./log/train/image_net_pretrain_bs1_right_model_gta_only/image_net_pretrain"  --save_dir "./log/train/image_net_pretrain_bs1_right_model_gta_only/MS_repeat"  --round_num 15 --target_mode "maxsquare" --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --lambda_target 0.1
 ```
 
 - MaxSquare+IW
 
 
 ```
-rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --gpu "0" --backbone "deeplabv2_multi" --dataset 'cityscapes' --exp_tag image_net_pretrain_IW_MS_repeat --restore_id image_net_pretrain --checkpoint_dir "./log/train/image_net_pretrain_bs1_right_model_gta_only/image_net_pretrain" --save_dir "./log/train/image_net_pretrain_bs1_right_model/IW_MS_repeat" --round_num 15 --target_mode "IW_maxsquare" --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --lambda_target 0.1 --IW_ratio 0.2
-
-
+rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --gpu "0" --backbone "deeplabv2_multi" --dataset 'cityscapes' --exp_tag image_net_pretrain_IW_MS_repeat --restore_id image_net_pretrain --checkpoint_dir "./log/train/image_net_pretrain_bs1_right_model_gta_only/image_net_pretrain" --save_dir "./log/train/image_net_pretrain_bs1_right_model_gta_only/IW_MS_repeat" --round_num 15 --target_mode "IW_maxsquare" --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --lambda_target 0.1 --IW_ratio 0.2
 ```
 
 
 - MaxSquare+IW+Multi
 
 ```
-
-rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --gpu "0" --backbone "deeplabv2_multi" --dataset 'cityscapes' --exp IW_MS_repeat --restore_id add_multi --checkpoint_dir "./log/train/add_multi_gta_only" --save_dir "./log/train/multi_MS_IW_repeat"  --round_num 15 --target_mode "IW_maxsquare" --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --target_crop_size "1280,640" --lambda_target 0.09 --IW_ratio 0.2 --multi True --lambda_seg 0.1 --threshold 0.95
-
+rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --gpu "0" --backbone "deeplabv2_multi" --dataset 'cityscapes' --exp IW_MS_repeat --restore_id add_multi --checkpoint_dir "./log/train/add_multi_gta_only" --save_dir "./log/train/add_multi_gta_only/multi_MS_IW_repeat"  --round_num 15 --target_mode "IW_maxsquare" --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --target_crop_size "1280,640" --lambda_target 0.09 --IW_ratio 0.2 --multi True --lambda_seg 0.1 --threshold 0.95
 ```
 ##### if your want to continue training 
 Set`"--continue_training True"` and change the init lr same as where it ends in `"--lr"`
@@ -152,12 +148,12 @@ Remember that the `"--exp_tag"` and `"--save_dir"` needs to be the same as befor
 - MaxSquare
 
 ```
-rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --gpu "0" --continue_training True --backbone "deeplabv2_multi" --dataset 'cityscapes' --exp_tag image_net_pretrain_MS --restore_id gta52cityscapes_maxsquare --checkpoint_dir "./log/train/image_net_pretrain_bs1_right_model/MS" --save_dir "./log/train/image_net_pretrain_bs1_right_model/MS"  --round_num 5 --target_mode "maxsquare" --freeze_bn False --weight_decay 5e-4 --lr 2.05e-7 --lambda_target 0.1
+rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --gpu "0" --continue_training True --backbone "deeplabv2_multi" --dataset 'cityscapes' --exp_tag image_net_pretrain_MS --restore_id gta52cityscapes_maxsquare --checkpoint_dir "./log/train/image_net_pretrain_bs1_right_model_gta_only/MS" --save_dir "./log/train/image_net_pretrain_bs1_right_model/MS"  --round_num 5 --target_mode "maxsquare" --freeze_bn False --weight_decay 5e-4 --lr 2.05e-7 --lambda_target 0.1
 ```
 
 - MaxSquare+IW
 ```
-rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --gpu "0" --continue_training True --backbone "deeplabv2_multi" --dataset 'cityscapes' --exp_tag image_net_pretrain_MS_IW  --restore_id gta52cityscapes_IW_maxsquare --checkpoint_dir "./log/train/image_net_pretrain_bs1_right_model/IW_MS"  --save_dir "./log/train/image_net_pretrain_bs1_right_model/IW_MS"  --round_num 10 --target_mode "IW_maxsquare" --freeze_bn False --weight_decay 5e-4 --lr 2.05e-7 --lambda_target 0.1 --IW_ratio 0.2
+rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --gpu "0" --continue_training True --backbone "deeplabv2_multi" --dataset 'cityscapes' --exp_tag image_net_pretrain_MS_IW  --restore_id gta52cityscapes_IW_maxsquare --checkpoint_dir "./log/train/image_net_pretrain_bs1_right_model_gta_only/IW_MS"  --save_dir "./log/train/image_net_pretrain_bs1_right_model_gta_only/IW_MS"  --round_num 10 --target_mode "IW_maxsquare" --freeze_bn False --weight_decay 5e-4 --lr 2.05e-7 --lambda_target 0.1 --IW_ratio 0.2
 
 ```
 
@@ -168,11 +164,15 @@ rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --gpu "0"
 
 ```
 
-##### 3.evaluation
+#### 3.evaluation
 Eval:
 
 ```
 python3 tools/evaluate.py --gpu "0" --dataset 'cityscapes' --checkpoint_dir "./log/eval_city" --pretrained_ckpt_file "./log/gta2city_AdaptSegNet_ST=0.1_maxsquare_round=5/gta52city_maxsquarebest.pth" --image_summary True --flip True
+```
+
+```
+rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/evaluate.py --gpu "0" --dataset 'cityscapes' --checkpoint_dir "./log/eval_city/add_multi_gta_only/multi_MS_IW/" --pretrained_ckpt_file "./log/train/add_multi_gta_only/multi_MS_IW/gta52cityscapes_IW_maxsquarebest.pth" --image_summary True --flip True
 ```
 
 To have a look at predicted examples, run tensorboard as follows:
