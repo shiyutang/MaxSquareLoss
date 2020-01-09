@@ -36,7 +36,7 @@ from tools.train_source import *
 
 class UDATrainer(Trainer):
     def __init__(self, args, cuda=None, train_id="None", logger=None):
-        super().__init__(args, cuda, train_id, logger)
+        super().__init__(args, cuda, train_id, logger)  # 调用父类的初始化，这样不用重写函数，同时初始化了应有的参数
         if self.args.source_dataset == 'synthia':
             source_data_set = SYNTHIA_Dataset(args, 
                                     data_root_path=args.source_data_path,
@@ -134,14 +134,10 @@ class UDATrainer(Trainer):
         for key, val in vars(self.args).items():
             self.logger.info("{:16} {}".format(key, val))
 
-        # choose cuda
-        current_device = torch.cuda.current_device()
-        self.logger.info("This model will run on {}".format(torch.cuda.get_device_name(current_device)))
-
         # load pretrained checkpoint
         if self.args.pretrained_ckpt_file is not None:
             if os.path.isdir(self.args.pretrained_ckpt_file):
-                self.args.pretrained_ckpt_file = os.path.join(self.args.checkpoint_dir, self.train_id + 'final.pth')
+                self.args.pretrained_ckpt_file = os.path.join(self.args.checkpoint_dir, self.restore_id + 'best.pth')
             self.load_checkpoint(self.args.pretrained_ckpt_file)
         
         if not self.args.continue_training:
@@ -151,14 +147,16 @@ class UDATrainer(Trainer):
             self.current_epoch = 0
 
         if self.args.continue_training:
-            self.load_checkpoint(os.path.join(self.args.checkpoint_dir, self.train_id + 'final.pth'))
+            self.load_checkpoint(os.path.join(self.args.checkpoint_dir, self.restore_id + 'final.pth'))
+            self.best_iter = self.current_iter         # the best iteration for target
+            self.best_source_iter = self.current_iter  # the best iteration for source
         
-        self.args.iter_max = self.dataloader.num_iterations*self.args.epoch_each_round*self.round_num
+        self.args.iter_max = self.current_iter+self.dataloader.num_iterations*self.args.epoch_each_round*self.round_num
         print(self.args.iter_max, self.dataloader.num_iterations)
 
         # train
         #self.validate() # check image summary
-        #self.validate_source()
+        # self.validate_source()
         self.train_round()
 
         self.writer.close()
@@ -168,19 +166,22 @@ class UDATrainer(Trainer):
             print("\n############## Begin {}/{} Round! #################\n".format(self.current_round+1, self.round_num))
             print("epoch_each_round:", self.args.epoch_each_round)
             
-            self.epoch_num = (self.current_round+1)*self.args.epoch_each_round
+            self.epoch_num = self.current_epoch+(self.current_round+1)*self.args.epoch_each_round
 
             # generate threshold
             self.threshold = self.args.threshold
-
-            self.train()
+            print("self.epoch_num",self.epoch_num)
+            # self.train(self.train_one_epoch_DA())
+            self.train()## it was using the method in the trainer
 
             self.current_round += 1
         
     def train_one_epoch(self):
-        tqdm_epoch = tqdm(zip(self.source_dataloader, self.target_dataloader), total=self.dataloader.num_iterations,
-                          desc="Train Round-{}-Epoch-{}-total-{}".format(self.current_round, self.current_epoch+1, self.epoch_num))
-        self.logger.info("Training one epoch...")
+        tqdm_epoch = tqdm(zip(self.source_dataloader, self.target_dataloader),
+                          total=self.dataloader.num_iterations,
+                          desc="Train Round-{}-Epoch-{}-total-{}".format(self.current_round,
+                                                      self.current_epoch+1, self.epoch_num))
+        self.logger.info("Training one epoch... in the method defined by solve_gta5")
         self.Eval.reset()
         
         # Initialize your average meters
@@ -200,7 +201,7 @@ class UDATrainer(Trainer):
         batch_idx = 0
         for batch_s, batch_t in tqdm_epoch:
             self.poly_lr_scheduler(optimizer=self.optimizer, init_lr=self.args.lr)
-            self.writer.add_scalar('learning_rate', self.optimizer.param_groups[0]["lr"], self.current_iter)
+            # self.writer.add_scalar('learning_rate', self.optimizer.param_groups[0]["lr"], self.current_iter)
 
             ##########################
             # source supervised loss #
@@ -234,6 +235,8 @@ class UDATrainer(Trainer):
             x, _, _ = batch_t
             if self.cuda:
                 x = Variable(x).to(self.device)
+
+            ##todo add the transform here
 
             pred = self.model(x)
             if isinstance(pred, tuple):
@@ -303,6 +306,7 @@ class UDATrainer(Trainer):
         
         #eval on source domain
         self.validate_source()
+        self.logger.info("learning rate for epoch {} is  {}".format(self.current_epoch,self.optimizer.param_groups[0]["lr"]))
 
 def add_UDA_train_args(arg_parser):
     arg_parser.add_argument('--source_dataset', default='gta5', type=str,
@@ -337,7 +341,7 @@ if __name__ == '__main__':
     arg_parser = add_UDA_train_args(arg_parser)
 
     args = arg_parser.parse_args()
-    args, train_id, logger = init_args(args)
+    args, _, logger = init_args(args)
     args.source_data_path = datasets_path[args.source_dataset]['data_root_path']
     args.source_list_path = datasets_path[args.source_dataset]['list_path']
 

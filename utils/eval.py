@@ -54,7 +54,7 @@ class Eval():
             MIoU_16 = np.nanmean(MIoU[synthia_set_16])
             MIoU_13 = np.nanmean(MIoU[synthia_set_13])
             return MIoU_16, MIoU_13
-        MIoU = np.nanmean(MIoU[:self.ignore_index])
+        MIoU = np.nanmean(MIoU[:self.ignore_index]) # compute mean ignore NAN
 
         return MIoU
 

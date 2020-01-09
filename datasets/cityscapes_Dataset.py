@@ -81,7 +81,7 @@ class City_Dataset(data.Dataset):
         # self.image_filepath = os.path.join(self.data_path, "leftImg8bit")
 
         # self.gt_filepath = os.path.join(self.data_path, "gtFine")
-
+        # print("item_list_filepath",item_list_filepath)
         self.items = [id.strip() for id in open(item_list_filepath)]
 
         ignore_label = -1
@@ -126,6 +126,7 @@ class City_Dataset(data.Dataset):
         # image_filepath = os.path.join(self.image_filepath, id.split("_")[0], id.split("_")[1])
         # image_filename = filename + "_leftImg8bit.png"
         # image_path = os.path.join(image_filepath, image_filename)
+        print("self.data_path,id",self.data_path,id)
         image_path = os.path.join(self.data_path,id)
         image = Image.open(image_path).convert("RGB")
 
@@ -260,8 +261,8 @@ class City_DataLoader():
         self.args = args
 
         data_set = City_Dataset(args, 
-                                data_root_path='./datasets/Cityscapes',
-                                list_path='./datasets/city_list',
+                                data_root_path=args.data_root_path,
+                                list_path=args.list_path,
                                 split=args.split,
                                 base_size=args.base_size,
                                 crop_size=args.crop_size,
