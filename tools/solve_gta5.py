@@ -330,7 +330,7 @@ def add_UDA_train_args(arg_parser):
                             choices=['maxsquare', 'IW_maxsquare', 'entropy', 'IW_entropy', 'hard'],
                             help="the loss function on target domain")
     arg_parser.add_argument('--lambda_target', type=float, default=1,
-                            help="lambda of target loss")
+                            help="lambda for all target loss")
     arg_parser.add_argument('--gamma', type=float, default=0, 
                             help='parameter for scaled entorpy')
     arg_parser.add_argument('--IW_ratio', type=float, default=0.2, 

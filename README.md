@@ -139,6 +139,8 @@ rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --gpu "0"
 
 ```
 rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --gpu "0" --backbone "deeplabv2_multi" --dataset 'cityscapes' --exp IW_MS_repeat --restore_id add_multi --checkpoint_dir "./log/train/add_multi_gta_only" --save_dir "./log/train/add_multi_gta_only/multi_MS_IW_repeat"  --round_num 15 --target_mode "IW_maxsquare" --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --target_crop_size "1280,640" --lambda_target 0.09 --IW_ratio 0.2 --multi True --lambda_seg 0.1 --threshold 0.95
+short version:
+rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --exp IW_MS_target_solo --restore_id add_multi --checkpoint_dir "./log/train/add_multi_gta_only" --save_dir "./log/train/add_multi_gta_only/multi_MS_IW_target_solo"  --round_num 20 --target_mode "IW_maxsquare" --lambda_target 0.09 --multi True
 ```
 ##### if your want to continue training 
 Set`"--continue_training True"` and change the init lr same as where it ends in `"--lr"`
