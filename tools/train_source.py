@@ -118,7 +118,7 @@ class Trainer():
         elif self.args.dataset=="gta5":
             self.dataloader = GTA5_DataLoader(self.args, datasets_path=datasets_path['gta5'])
         else:
-            self.dataloader = SYNTHIA_DataLoader(self.args,datasets_path['synthia'])
+            self.dataloader = SYNTHIA_DataLoader(self.args,datasets_path = datasets_path['synthia'])
         self.dataloader.num_iterations = min(self.dataloader.num_iterations, ITER_MAX)
         print(self.args.iter_max, self.dataloader.num_iterations)
         self.epoch_num = ceil(self.args.iter_max / self.dataloader.num_iterations) if self.args.iter_stop is None else \
@@ -152,7 +152,7 @@ class Trainer():
 
         for epoch in tqdm(range(self.current_epoch, self.epoch_num),
                           desc="Total {} epochs".format(self.epoch_num)):
-            self.train_one_epoch()
+            self.train_one_epoch(epoch=epoch)
 
             # validate
             PA, MPA, MIoU, FWIoU = self.validate()
@@ -185,7 +185,7 @@ class Trainer():
         self.logger.info("=>saving the final checkpoint to " + os.path.join(self.args.save_dir, self.train_id+'final.pth'))
         self.save_checkpoint(self.train_id+'final.pth')
 
-    def train_one_epoch(self):
+    def train_one_epoch(self,epoch=0):
         tqdm_epoch = tqdm(self.dataloader.data_loader, total=self.dataloader.num_iterations,
                           desc="Train Epoch-{}-total-{}".format(self.current_epoch+1, self.epoch_num))
         self.logger.info("Training one epoch...")

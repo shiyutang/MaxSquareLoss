@@ -27,8 +27,6 @@ from datasets.synthia_Dataset import SYNTHIA_Dataset
 
 from tools.train_source import *
 
-
-
 class UDATrainer(Trainer):
     def __init__(self, args, cuda=None, train_id="None", logger=None, datasets_path=None,styles=None):
         super().__init__(args, cuda, train_id, logger)  # 调用父类的初始化，这样不用重写函数，同时初始化了应有的参数
@@ -177,12 +175,13 @@ class UDATrainer(Trainer):
 
             self.current_round += 1
         
-    def train_one_epoch(self):
+    def train_one_epoch(self,epoch=0):
         tqdm_epoch = tqdm(zip(self.source_dataloader, self.target_dataloader),
                           total=self.dataloader.num_iterations,
                           desc="Train Round-{}-Epoch-{}-total-{}".format(self.current_round,
                                                       self.current_epoch+1, self.epoch_num))
         self.logger.info("Training one epoch... in the method defined by solve_gta5")
+
         self.Eval.reset()
 
         
@@ -201,6 +200,11 @@ class UDATrainer(Trainer):
             self.model.train()
 
         batch_idx = 0
+        if epoch > 25:
+            self.train_source = False
+            self.logger.info("#####stop train on source,adjust to target only~~###")
+        else:
+            self.train_source = True
         for batch_s, batch_t in tqdm_epoch:
             self.poly_lr_scheduler(optimizer=self.optimizer, init_lr=self.args.lr)
             # self.writer.add_scalar('learning_rate', self.optimizer.param_groups[0]["lr"], self.current_iter)
@@ -209,27 +213,28 @@ class UDATrainer(Trainer):
             # source supervised loss #
             ##########################
             # train with source
-            x, y, _ = batch_s
-            if self.cuda:
-                x, y = Variable(x).to(self.device), Variable(y).to(device=self.device, dtype=torch.long)
-
-            pred = self.model(x)
-            if isinstance(pred, tuple): # multi has 2 prediction
-                pred_2 = pred[1]
-                pred = pred[0]
-
-            y = torch.squeeze(y, 1)
-            loss = self.loss(pred, y)
-
-            loss_ = loss
-            if self.args.multi:
-                loss_2 = self.args.lambda_seg * self.loss(pred_2, y)
-                loss_ += loss_2
-                loss_seg_value_2 += loss_2.cpu().item() / iter_num
-
-            loss_.backward()
-            loss_seg_value += loss.cpu().item() / iter_num
-            
+            if self.train_source:
+                x, y, _ = batch_s
+                if self.cuda:
+                    x, y = Variable(x).to(self.device), Variable(y).to(device=self.device, dtype=torch.long)
+    
+                pred = self.model(x)
+                if isinstance(pred, tuple): # multi has 2 prediction
+                    pred_2 = pred[1]
+                    pred = pred[0]
+    
+                y = torch.squeeze(y, 1)
+                loss = self.loss(pred, y)
+    
+                loss_ = loss
+                if self.args.multi:
+                    loss_2 = self.args.lambda_seg * self.loss(pred_2, y)
+                    loss_ += loss_2
+                    loss_seg_value_2 += loss_2.cpu().item() / iter_num
+    
+                loss_.backward()
+                loss_seg_value += loss.cpu().item() / iter_num
+                
             ###############
             # target loss #
             ###############
@@ -349,12 +354,6 @@ if __name__ == '__main__':
     args.target_dataset = args.dataset
 
     train_id = str(args.source_dataset)+"2"+str(args.target_dataset)+"_"+args.target_mode
-    styles = []
-    for f in Path("/data/Projects/ADVENT/data").glob("*"):
-        if "GTA5_" in str(f):
-            styles.append(f.stem)
-
-    logger.info(styles)
 
     agent = UDATrainer(args=args, cuda=True, train_id=train_id, logger=logger, datasets_path=datasets_path,styles=styles)
     agent.main()
