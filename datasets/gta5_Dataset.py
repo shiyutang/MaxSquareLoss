@@ -76,13 +76,13 @@ class GTA5_Dataset(City_Dataset):
         return image, gt_image, item
 
 class GTA5_DataLoader():
-    def __init__(self, args, training=True):
+    def __init__(self, args, training=True,datasets_path=None):
 
         self.args = args
 
         data_set = GTA5_Dataset(args, 
-                                data_root_path=args.data_root_path,
-                                list_path=args.list_path,
+                                data_root_path=datasets_path['data_root_path'],
+                                list_path=datasets_path['list_path'],
                                 split=args.split,
                                 base_size=args.base_size,
                                 crop_size=args.crop_size,
@@ -106,13 +106,13 @@ class GTA5_DataLoader():
             raise Warning("split must be train/val/trainavl/test/all")
 
         val_split = 'val' if self.args.split == "train" else 'test'
-        val_set = GTA5_Dataset(args, 
-                            data_root_path=args.data_root_path,
-                            list_path=args.list_path,
-                            split=val_split,
-                            base_size=args.base_size,
-                            crop_size=args.crop_size,
-                            training=False)
+        val_set = GTA5_Dataset(args,
+                               data_root_path=datasets_path['data_root_path'],
+                               list_path=datasets_path['list_path'],
+                                split=val_split,
+                                base_size=args.base_size,
+                                crop_size=args.crop_size,
+                                training=False)
         self.val_loader = data.DataLoader(val_set,
                                             batch_size=self.args.batch_size,
                                             shuffle=False,

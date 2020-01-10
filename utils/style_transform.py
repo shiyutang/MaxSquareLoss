@@ -8,8 +8,9 @@ import torch
 import torch.nn as nn
 from torchvision import transforms
 from torchvision.utils import save_image
+from tqdm import tqdm
 
-
+style_dirs = [f for f in Path("/data/Projects/MaxSquareLoss/imagenet_style").glob("*")]
 
 
 def calc_mean_std(feat, eps=1e-5):
@@ -234,7 +235,7 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
                    vgg_pretrain = "/data/Projects/pytorch-AdaIN/models/vgg_normalised.pth",vgg = vgg,
                    decoder_pretrain="/data/Projects/pytorch-AdaIN/models/decoder.pth",decoder=decoder,
                    content_size=0,style_size=(1052,1914),crop=None,save_ext=".jpg",
-                   output_path="../output", preserve_color=None, alpha=1.0,
+                   output_path="", preserve_color=None, alpha=1.0,
                    style_interpolation_weight=None,exp_tag = "", do_interpolation=False):
 
 
@@ -254,7 +255,6 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
         assert (0.0 <= alpha <= 1.0)
         content_f = vgg(content)
         style_f = vgg(style)
-        # todo 检查中间均值和方差的变化
         if interpolation_weights:
             _, C, H, W = content_f.size()
             feat = torch.FloatTensor(1, C, H, W).zero_().to(device)
@@ -276,7 +276,7 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    output_dir = Path(os.path.join(output_path, exp_tag))
+    output_dir = Path(output_path)
     output_dir.mkdir(exist_ok=True, parents=True)
 
 
@@ -318,7 +318,7 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
     content_tf = test_transform(content_size,crop)
     style_tf = test_transform(style_size,crop)
 
-    for content_path in content_paths:
+    for i,content_path in enumerate(tqdm(content_paths)):
         if do_interpolation:
             style = torch.stack([style_tf(Image.open(file)) for file in style_paths])
             content = content_tf(Image.open(content_path)).unsqueeze(0).expand_as(style)
@@ -330,8 +330,7 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
                                             interpolation_weight)
 
             output_Tensor.cpu()
-            out_name =output_dir / '{}_2_{}_interpolation.{}'.format(
-                            content_path.stem, Path(style_paths[0]).stem, save_ext)
+            out_name =output_dir / "{}.{}".format(i, save_ext)
             save_image(output_Tensor,out_name)
 
         else:
@@ -355,9 +354,8 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
 
 
 if __name__ == '__main__':
-    content_dir = "/data/Projects/pytorch-AdaIN/input/GTA5"
-    style_dirs = [f for f in Path("/data/Projects/pytorch-AdaIN/input/imagenet_style").glob("*")]
-    exp_tag = "10_classes"
+    content_dir = "/data/Projects/ADVENT/data/GTA5/images"
+    exp_tag = "v1"
     style_interpolation_weight = "1,1,1,1"
 
     for style_dir in style_dirs:
@@ -366,6 +364,7 @@ if __name__ == '__main__':
                              vgg_pretrain="/data/Projects/pytorch-AdaIN/models/vgg_normalised.pth",
                              decoder_pretrain="/data/Projects/pytorch-AdaIN/models/decoder.pth",
                              vgg=vgg,decoder=decoder,do_interpolation=False,
-                             content_size=0, style_size=(1052, 1914), crop=None, save_ext="jpg",
-                             output_path="/data/Projects/MaxSquareLoss/output", preserve_color=None, alpha=1.0,
+                             content_size=0, style_size=(1052, 1914), crop=None, save_ext="png",
+                             output_path="/data/Projects/ADVENT/data/GTA5_{}/images".format(style_dir.stem),
+                             preserve_color=None, alpha=1.0,
                              style_interpolation_weight=style_interpolation_weight, exp_tag=exp_tag)

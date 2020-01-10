@@ -75,8 +75,6 @@ class City_Dataset(data.Dataset):
         self.gaussian_blur = args.gaussian_blur
 
         item_list_filepath = os.path.join(self.list_path, self.split+".txt")
-        if not os.path.exists(item_list_filepath):
-            raise Warning("split must be train/val/trainval")
 
         # self.image_filepath = os.path.join(self.data_path, "leftImg8bit")
 
@@ -126,7 +124,7 @@ class City_Dataset(data.Dataset):
         # image_filepath = os.path.join(self.image_filepath, id.split("_")[0], id.split("_")[1])
         # image_filename = filename + "_leftImg8bit.png"
         # image_path = os.path.join(image_filepath, image_filename)
-        print("self.data_path,id",self.data_path,id)
+        # print("self.data_path,id",self.data_path,id)
         image_path = os.path.join(self.data_path,id)
         image = Image.open(image_path).convert("RGB")
 
@@ -256,13 +254,13 @@ class City_Dataset(data.Dataset):
         return len(self.items)
 
 class City_DataLoader():
-    def __init__(self, args, training=True):
+    def __init__(self, args, training=True, datasets_path=None):
 
         self.args = args
 
         data_set = City_Dataset(args, 
-                                data_root_path=args.data_root_path,
-                                list_path=args.list_path,
+                                data_root_path=datasets_path['data_root_path'],
+                                list_path=datasets_path['list_path'],
                                 split=args.split,
                                 base_size=args.base_size,
                                 crop_size=args.crop_size,
@@ -285,15 +283,15 @@ class City_DataLoader():
                                                pin_memory=self.args.pin_memory,
                                                drop_last=True)
 
-        val_set = City_Dataset(args, 
-                            data_root_path='./datasets/Cityscapes',
-                            list_path='./datasets/city_list',
-                            split='val',
-                            base_size=args.base_size,
-                            crop_size=args.crop_size,
-                            training=False,
-                            class_16=args.class_16,
-                            class_13=args.class_13)
+        val_set = City_Dataset(args,
+                               data_root_path=datasets_path['data_root_path'],
+                               list_path=datasets_path['list_path'],
+                                split='val',
+                                base_size=args.base_size,
+                                crop_size=args.crop_size,
+                                training=False,
+                                class_16=args.class_16,
+                                class_13=args.class_13)
         self.val_loader = data.DataLoader(val_set,
                                             batch_size=self.args.batch_size,
                                             shuffle=False,

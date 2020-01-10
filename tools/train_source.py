@@ -30,6 +30,24 @@ datasets_path={
     'gta5': {'data_root_path': '/data/Projects/ADVENT/data/GTA5', 'list_path': '/data/Projects/ADVENT/data/GTA5',
                     'image_path':'/data/Projects/ADVENT/data/GTA5/images',
                     'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
+    'GTA5_accordion': {'data_root_path': '/data/Projects/ADVENT/data/GTA5_accordion', 'list_path': '/data/Projects/ADVENT/data/GTA5',
+                    'image_path':'/data/Projects/ADVENT/data/GTA5_accordion/images',
+                    'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
+    'GTA5_ambulance': {'data_root_path': '/data/Projects/ADVENT/data/GTA5_ambulance','list_path': '/data/Projects/ADVENT/data/GTA5',
+                       'image_path': '/data/Projects/ADVENT/data/GTA5_ambulance/images',
+                       'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
+    'GTA5_church': {'data_root_path': '/data/Projects/ADVENT/data/GTA5_church',
+                       'list_path': '/data/Projects/ADVENT/data/GTA5',
+                       'image_path': '/data/Projects/ADVENT/data/GTA5_church/images',
+                       'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
+    'GTA5_elephant': {'data_root_path': '/data/Projects/ADVENT/data/GTA5_elephant',
+                       'list_path': '/data/Projects/ADVENT/data/GTA5',
+                       'image_path': '/data/Projects/ADVENT/data/GTA5_elephant/images',
+                       'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
+    'GTA5_prunus_mume': {'data_root_path': '/data/Projects/ADVENT/data/GTA5_prunus_mume',
+                       'list_path': '/data/Projects/ADVENT/data/GTA5',
+                       'image_path': '/data/Projects/ADVENT/data/GTA5_prunus_mume/images',
+                       'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
     'synthia': {'data_root_path': '/data/Projects/ADVENT/data/SYNTHIA', 'list_path': '/data/Projects/ADVENT/data/SYNTHIA/list',
                     'image_path':'/data/Projects/ADVENT/data/SYNTHIA/RGB',
                     'gt_path': '/data/Projects/ADVENT/data/GT/LABELS'},
@@ -96,11 +114,11 @@ class Trainer():
 
         # dataloader
         if self.args.dataset=="cityscapes":
-            self.dataloader = City_DataLoader(self.args)
+            self.dataloader = City_DataLoader(self.args, datasets_path=datasets_path['cityscapes'])
         elif self.args.dataset=="gta5":
-            self.dataloader = GTA5_DataLoader(self.args)
+            self.dataloader = GTA5_DataLoader(self.args, datasets_path=datasets_path['gta5'])
         else:
-            self.dataloader = SYNTHIA_DataLoader(self.args)
+            self.dataloader = SYNTHIA_DataLoader(self.args,datasets_path['synthia'])
         self.dataloader.num_iterations = min(self.dataloader.num_iterations, ITER_MAX)
         print(self.args.iter_max, self.dataloader.num_iterations)
         self.epoch_num = ceil(self.args.iter_max / self.dataloader.num_iterations) if self.args.iter_stop is None else \
@@ -129,15 +147,12 @@ class Trainer():
 
         self.writer.close()
 
-    def train(self,train_method=None):
+    def train(self):
         # self.validate() # check image summary
 
         for epoch in tqdm(range(self.current_epoch, self.epoch_num),
                           desc="Total {} epochs".format(self.epoch_num)):
-            if not train_method==None:
-                train_method()
-            else:
-                self.train_one_epoch()
+            self.train_one_epoch()
 
             # validate
             PA, MPA, MIoU, FWIoU = self.validate()
@@ -622,6 +637,8 @@ def init_args(args):
 
     # train_id = str(args.dataset)
     train_id = args.exp_tag
+    if not os.path.exists(args.save_dir):
+        os.mkdir(args.save_dir)
 
     crop_size = args.crop_size.split(',')
     base_size = args.base_size.split(',')
@@ -660,7 +677,7 @@ def init_args(args):
     # logger configure
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
-    fh = logging.FileHandler(os.path.join(args.save_dir, train_id+'train_log.txt'))
+    fh = logging.FileHandler(os.path.join(args.save_dir, train_id+'_train_log.txt'))
     ch = logging.StreamHandler()
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     fh.setFormatter(formatter)

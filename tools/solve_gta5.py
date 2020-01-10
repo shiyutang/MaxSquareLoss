@@ -1,12 +1,3 @@
-'''
-@Description: 
-@version: 
-@Company: 
-@Author: Minghao Chen
-@Date: 2019-03-02 14:06:37
-@LastEditors: Minghao Chen
-@LastEditTime: 2019-09-27 18:22:46
-'''
 import os
 import random
 import logging
@@ -25,6 +16,8 @@ import torch.utils.data as data
 from torch.autograd import Variable
 
 import sys
+from pathlib import Path
+import random
 sys.path.append(os.path.abspath('.'))
 from utils.eval import Eval
 from utils.loss import *
@@ -34,9 +27,15 @@ from datasets.synthia_Dataset import SYNTHIA_Dataset
 
 from tools.train_source import *
 
+
+
 class UDATrainer(Trainer):
-    def __init__(self, args, cuda=None, train_id="None", logger=None):
+    def __init__(self, args, cuda=None, train_id="None", logger=None, datasets_path=None,styles=None):
         super().__init__(args, cuda, train_id, logger)  # 调用父类的初始化，这样不用重写函数，同时初始化了应有的参数
+
+        self.datasets_path = datasets_path
+        self.styles = styles
+        ## source train loader
         if self.args.source_dataset == 'synthia':
             source_data_set = SYNTHIA_Dataset(args, 
                                     data_root_path=args.source_data_path,
@@ -80,6 +79,9 @@ class UDATrainer(Trainer):
                                                pin_memory=self.args.pin_memory,
                                                drop_last=True)
         print(self.args.source_dataset, self.args.target_dataset)
+
+
+        ## target dataset train and validation
         target_data_set = City_Dataset(args, 
                                 data_root_path=args.data_root_path,
                                 list_path=args.list_path,
@@ -171,8 +173,7 @@ class UDATrainer(Trainer):
             # generate threshold
             self.threshold = self.args.threshold
             print("self.epoch_num",self.epoch_num)
-            # self.train(self.train_one_epoch_DA())
-            self.train()## it was using the method in the trainer
+            self.train() ## it was using the method in the trainer
 
             self.current_round += 1
         
@@ -183,6 +184,7 @@ class UDATrainer(Trainer):
                                                       self.current_epoch+1, self.epoch_num))
         self.logger.info("Training one epoch... in the method defined by solve_gta5")
         self.Eval.reset()
+
         
         # Initialize your average meters
         loss_seg_value = 0
@@ -194,7 +196,7 @@ class UDATrainer(Trainer):
         # Set the model to be in training mode (for batchnorm and dropout)
         if self.args.freeze_bn:
             self.model.eval()
-            self.logger.info("freeze bacth normalization successfully!")
+            self.logger.info("freeze batch normalization successfully!")
         else:
             self.model.train()
 
@@ -212,7 +214,7 @@ class UDATrainer(Trainer):
                 x, y = Variable(x).to(self.device), Variable(y).to(device=self.device, dtype=torch.long)
 
             pred = self.model(x)
-            if isinstance(pred, tuple):
+            if isinstance(pred, tuple): # multi has 2 prediction
                 pred_2 = pred[1]
                 pred = pred[0]
 
@@ -236,7 +238,6 @@ class UDATrainer(Trainer):
             if self.cuda:
                 x = Variable(x).to(self.device)
 
-            ##todo add the transform here
 
             pred = self.model(x)
             if isinstance(pred, tuple):
@@ -348,6 +349,12 @@ if __name__ == '__main__':
     args.target_dataset = args.dataset
 
     train_id = str(args.source_dataset)+"2"+str(args.target_dataset)+"_"+args.target_mode
+    styles = []
+    for f in Path("/data/Projects/ADVENT/data").glob("*"):
+        if "GTA5_" in str(f):
+            styles.append(f.stem)
 
-    agent = UDATrainer(args=args, cuda=True, train_id=train_id, logger=logger)
+    logger.info(styles)
+
+    agent = UDATrainer(args=args, cuda=True, train_id=train_id, logger=logger, datasets_path=datasets_path,styles=styles)
     agent.main()
