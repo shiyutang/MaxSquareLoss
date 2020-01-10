@@ -234,7 +234,7 @@ def coral(source, target):
 def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_dir=None,
                    vgg_pretrain = "/data/Projects/pytorch-AdaIN/models/vgg_normalised.pth",vgg = vgg,
                    decoder_pretrain="/data/Projects/pytorch-AdaIN/models/decoder.pth",decoder=decoder,
-                   content_size=0,style_size=(1052,1914),crop=None,save_ext=".jpg",
+                   content_size=(1052, 1914),style_size=(1052,1914),crop=None,save_ext=".jpg",
                    output_path="", preserve_color=None, alpha=1.0,
                    style_interpolation_weight=None,exp_tag = "", do_interpolation=False):
 
@@ -319,6 +319,9 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
     style_tf = test_transform(style_size,crop)
 
     for i,content_path in enumerate(tqdm(content_paths)):
+        out_name = output_dir / "{}.{}".format(i, save_ext)
+        if out_name.exists():
+            continue
         if do_interpolation:
             style = torch.stack([style_tf(Image.open(file)) for file in style_paths])
             content = content_tf(Image.open(content_path)).unsqueeze(0).expand_as(style)
@@ -358,13 +361,14 @@ if __name__ == '__main__':
     exp_tag = "v1"
     style_interpolation_weight = "1,1,1,1"
 
-    for style_dir in style_dirs:
-        style = random.sample([p for p in Path(style_dir).glob("*")],4)
-        style_transfer_AdaIN(content=None, content_dir=content_dir, style=style, style_dir=None,
-                             vgg_pretrain="/data/Projects/pytorch-AdaIN/models/vgg_normalised.pth",
-                             decoder_pretrain="/data/Projects/pytorch-AdaIN/models/decoder.pth",
-                             vgg=vgg,decoder=decoder,do_interpolation=False,
-                             content_size=0, style_size=(1052, 1914), crop=None, save_ext="png",
-                             output_path="/data/Projects/ADVENT/data/GTA5_{}/images".format(style_dir.stem),
-                             preserve_color=None, alpha=1.0,
-                             style_interpolation_weight=style_interpolation_weight, exp_tag=exp_tag)
+    style_dir=style_dirs[4]
+    print("style_dir",style_dir)
+    style = random.sample([p for p in Path(style_dir).glob("*")],4)
+    style_transfer_AdaIN(content=None, content_dir=content_dir, style=style, style_dir=None,
+                         vgg_pretrain="/data/Projects/pytorch-AdaIN/models/vgg_normalised.pth",
+                         decoder_pretrain="/data/Projects/pytorch-AdaIN/models/decoder.pth",
+                         vgg=vgg,decoder=decoder,do_interpolation=False,
+                         content_size=(1052, 1914), style_size=(1052, 1914), crop=None, save_ext="png",
+                         output_path="/data/Projects/ADVENT/data/GTA5_{}/images".format(style_dir.stem),
+                         preserve_color=None, alpha=1.0,
+                         style_interpolation_weight=style_interpolation_weight, exp_tag=exp_tag)
