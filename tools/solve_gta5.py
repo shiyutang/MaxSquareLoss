@@ -355,5 +355,5 @@ if __name__ == '__main__':
 
     train_id = str(args.source_dataset)+"2"+str(args.target_dataset)+"_"+args.target_mode
 
-    agent = UDATrainer(args=args, cuda=True, train_id=train_id, logger=logger, datasets_path=datasets_path,styles=styles)
+    agent = UDATrainer(args=args, cuda=True, train_id=train_id, logger=logger, datasets_path=datasets_path)
     agent.main()
