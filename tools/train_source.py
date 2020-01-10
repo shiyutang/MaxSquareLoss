@@ -582,7 +582,7 @@ def add_train_args(arg_parser):
                             help='base size of image')
     arg_parser.add_argument('--target_base_size', default="1024,512", type=str,
                             help='crop size of target image')
-    arg_parser.add_argument('--target_crop_size', default="1024,512", type=str,
+    arg_parser.add_argument('--target_crop_size', default="1280,640", type=str,
                             help='base size of target image')
     arg_parser.add_argument('--num_classes', default=19, type=int,
                             help='num class of mask')
