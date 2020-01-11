@@ -18,6 +18,7 @@ class GTA5_Dataset(City_Dataset):
                  args,
                  data_root_path='./datasets/GTA5',
                  list_path='./datasets/GTA5/list',
+                 gt_path = None,
                  split='train',
                  base_size=769,
                  crop_size=769,
@@ -46,7 +47,7 @@ class GTA5_Dataset(City_Dataset):
 
         self.image_filepath = os.path.join(self.data_path, "images")
 
-        self.gt_filepath = os.path.join(self.data_path, "labels")
+        self.gt_filepath = gt_path
 
         self.items = [id.strip() for id in open(item_list_filepath)]
 

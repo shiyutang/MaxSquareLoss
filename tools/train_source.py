@@ -24,9 +24,30 @@ from datasets.synthia_Dataset import SYNTHIA_DataLoader
 
 
 datasets_path={
-    'cityscapes': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes', 'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
+    'cityscapes': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes',
+                   'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
                     'image_path':'/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
                     'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
+    'Cityscapes_accordion': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_accordion',
+                   'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
+                   'image_path': '/data/Projects/ADVENT/data/Cityscapes_accordion/leftImg8bit',
+                   'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
+    'Cityscapes_ambulance': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance',
+                   'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
+                   'image_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance/leftImg8bit',
+                   'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
+    'Cityscapes_church': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_church',
+                   'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
+                   'image_path': '/data/Projects/ADVENT/data/Cityscapes_church/leftImg8bit',
+                   'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
+    'Cityscapes_elephant': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_elephant',
+                   'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
+                   'image_path': '/data/Projects/ADVENT/data/Cityscapes_elephant/leftImg8bit',
+                   'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
+    'Cityscapes_prunus_mume': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_prunus_mume',
+                   'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
+                   'image_path': '/data/Projects/ADVENT/data/Cityscapes_prunus_mume/leftImg8bit',
+                   'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
     'gta5': {'data_root_path': '/data/Projects/ADVENT/data/GTA5', 'list_path': '/data/Projects/ADVENT/data/GTA5',
                     'image_path':'/data/Projects/ADVENT/data/GTA5/images',
                     'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
@@ -118,7 +139,7 @@ class Trainer():
         elif self.args.dataset=="gta5":
             self.dataloader = GTA5_DataLoader(self.args, datasets_path=datasets_path['gta5'])
         else:
-            self.dataloader = SYNTHIA_DataLoader(self.args,datasets_path = datasets_path['synthia'])
+            self.dataloader = SYNTHIA_DataLoader(self.args,datasets_path['synthia'])
         self.dataloader.num_iterations = min(self.dataloader.num_iterations, ITER_MAX)
         print(self.args.iter_max, self.dataloader.num_iterations)
         self.epoch_num = ceil(self.args.iter_max / self.dataloader.num_iterations) if self.args.iter_stop is None else \
@@ -152,7 +173,7 @@ class Trainer():
 
         for epoch in tqdm(range(self.current_epoch, self.epoch_num),
                           desc="Total {} epochs".format(self.epoch_num)):
-            self.train_one_epoch(epoch=epoch)
+            self.train_one_epoch()
 
             # validate
             PA, MPA, MIoU, FWIoU = self.validate()
@@ -185,7 +206,7 @@ class Trainer():
         self.logger.info("=>saving the final checkpoint to " + os.path.join(self.args.save_dir, self.train_id+'final.pth'))
         self.save_checkpoint(self.train_id+'final.pth')
 
-    def train_one_epoch(self,epoch=0):
+    def train_one_epoch(self):
         tqdm_epoch = tqdm(self.dataloader.data_loader, total=self.dataloader.num_iterations,
                           desc="Train Epoch-{}-total-{}".format(self.current_epoch+1, self.epoch_num))
         self.logger.info("Training one epoch...")
@@ -516,7 +537,6 @@ class Trainer():
                 self.current_epoch = checkpoint["epoch"]
                 self.current_iter = checkpoint["iteration"]
                 self.best_MIou = checkpoint["best_MIou"]
-                #todo: check if optimizer,current epoch, current_iter best_MIou will be replaced or in the way of sth
 
         except OSError as e:
             self.logger.info("No checkpoint exists from '{}'. Skipping...".format(self.args.checkpoint_dir))

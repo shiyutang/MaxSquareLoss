@@ -44,6 +44,7 @@ class City_Dataset(data.Dataset):
                  args,
                  data_root_path=os.path.abspath('./datasets/Cityscapes'),
                  list_path=os.path.abspath('./datasets/city_list'),
+                 gt_path=None,
                  split='train',
                  base_size=769,
                  crop_size=769,
@@ -61,6 +62,7 @@ class City_Dataset(data.Dataset):
         self.args = args
         self.data_path=data_root_path
         self.list_path=list_path
+        self.gt_path =gt_path
         self.split=split
         self.base_size=base_size
         self.crop_size=crop_size
@@ -128,11 +130,10 @@ class City_Dataset(data.Dataset):
         image_path = os.path.join(self.data_path,id)
         image = Image.open(image_path).convert("RGB")
 
-        # gt_filepath = os.path.join(self.gt_filepath, id.split("_")[0], id.split("_")[1])
-        # gt_filename = filename + "_gtFine_labelIds.png"
-        # gt_image_path = os.path.join(gt_filepath, gt_filename)
-        gt_image_path = os.path.join(self.data_path,id.replace("leftImg8bit","gtFine",1)
-                                     .replace("leftImg8bit","gtFine_labelIds"))
+        # print("self.gt_path",self.gt_path)
+        gt_image_path = self.gt_path+id.replace("leftImg8bit","",1)\
+                                     .replace("leftImg8bit","gtFine_labelIds")
+        # print("gt_image_path",gt_image_path)
         gt_image = Image.open(gt_image_path)
 
         if (self.split == "train" or self.split == "trainval") and self.training:
@@ -261,6 +262,7 @@ class City_DataLoader():
         data_set = City_Dataset(args, 
                                 data_root_path=datasets_path['data_root_path'],
                                 list_path=datasets_path['list_path'],
+                                gt_path=datasets_path['gt_path'],
                                 split=args.split,
                                 base_size=args.base_size,
                                 crop_size=args.crop_size,
@@ -286,6 +288,7 @@ class City_DataLoader():
         val_set = City_Dataset(args,
                                data_root_path=datasets_path['data_root_path'],
                                list_path=datasets_path['list_path'],
+                               gt_path=datasets_path['gt_path'],
                                 split='val',
                                 base_size=args.base_size,
                                 crop_size=args.crop_size,
