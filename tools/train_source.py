@@ -173,7 +173,7 @@ class Trainer():
 
         for epoch in tqdm(range(self.current_epoch, self.epoch_num),
                           desc="Total {} epochs".format(self.epoch_num)):
-            self.train_one_epoch()
+            self.train_one_epoch(epoch)
 
             # validate
             PA, MPA, MIoU, FWIoU = self.validate()
@@ -195,18 +195,11 @@ class Trainer():
             
             self.current_epoch += 1
 
-        state = {
-            'epoch': self.current_epoch + 1,
-            'iteration': self.current_iter,
-            'state_dict': self.model.state_dict(),
-            'optimizer': self.optimizer.state_dict(),
-            'best_MIou': self.current_MIoU
-        }
         self.logger.info("=>best_MIou {} at {}".format(self.best_MIou, self.best_iter))
         self.logger.info("=>saving the final checkpoint to " + os.path.join(self.args.save_dir, self.train_id+'final.pth'))
         self.save_checkpoint(self.train_id+'final.pth')
 
-    def train_one_epoch(self):
+    def train_one_epoch(self,epoch=None):
         tqdm_epoch = tqdm(self.dataloader.data_loader, total=self.dataloader.num_iterations,
                           desc="Train Epoch-{}-total-{}".format(self.current_epoch+1, self.epoch_num))
         self.logger.info("Training one epoch...")

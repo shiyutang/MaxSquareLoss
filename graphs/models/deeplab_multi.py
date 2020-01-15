@@ -81,7 +81,7 @@ class ResNetMulti(nn.Module):
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=1, dilation=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=1, dilation=4)
-        self.layer5 = self._make_pred_layer(Classifier_Module, 1024, [6, 12, 18, 24], [6, 12, 18, 24], num_classes)
+        self.layer5 = self._make_pred_layer(Classifier_Module, 1024, [6, 12, 18, 24], [6, 12, 18, 24], num_classes) #ASPP
         self.layer6 = self._make_pred_layer(Classifier_Module, 2048, [6, 12, 18, 24], [6, 12, 18, 24], num_classes)
 
         for m in self.modules():
@@ -174,7 +174,7 @@ class ResNetMulti(nn.Module):
 def DeeplabMulti(num_classes=21, pretrained=True):
     model = ResNetMulti(Bottleneck, [3, 4, 23, 3], num_classes)
 
-    if pretrained:
+    if pretrained:  # 加载除了layer5之外的其他参数
         restore_from = '/data/Projects/MaxSquareLoss/graphs/models/pretrained_model/DeepLab_resnet_pretrained_init-f81d91e8.pth'
         saved_state_dict = torch.load(restore_from)
 

@@ -61,40 +61,6 @@ class UDATrainer(Trainer):
                                                  num_workers=self.args.data_loader_workers,
                                                  pin_memory=self.args.pin_memory,
                                                  drop_last=True)
-        self.aux_dataset_source = {}
-        self.aux_dataloader_source = {}
-        self.aux_dataset_target = {}
-        self.aux_dataloader_target = {}
-        for style in styles_source:
-            self.aux_dataset_source[style] = GTA5_Dataset(args, base_size=args.base_size, crop_size=args.crop_size,
-                                                          data_root_path=datasets_path[style]['data_root_path'],
-                                                          list_path=datasets_path[style]['list_path'],
-                                                          gt_path=datasets_path[style]['gt_path'])
-
-            self.aux_dataloader_source[style] = data.DataLoader(self.aux_dataset_source[style],
-                                                                batch_size=self.args.batch_size,
-                                                                shuffle=False,
-                                                                num_workers=self.args.data_loader_workers,
-                                                                pin_memory=self.args.pin_memory,
-                                                                drop_last=True)
-        for style in styles_target:
-            self.aux_dataset_target[style] = City_Dataset(args,
-                                                          data_root_path=self.datasets_path[style]['data_root_path'],
-                                                          list_path=self.datasets_path[style]['list_path'],
-                                                          gt_path=self.datasets_path[style]['gt_path'],
-                                                          split=args.split,
-                                                          base_size=args.target_base_size,
-                                                          crop_size=args.target_crop_size,
-                                                          class_16=args.class_16,
-                                                          )
-
-            self.aux_dataloader_target[style] = data.DataLoader(self.aux_dataset_target[style],
-                                                                batch_size=self.args.batch_size,
-                                                                shuffle=False,
-                                                                num_workers=self.args.data_loader_workers,
-                                                                pin_memory=self.args.pin_memory,
-                                                                drop_last=True)
-
         ## source validation loader
         if self.args.source_dataset == 'synthia':
             source_data_set = SYNTHIA_Dataset(args,
@@ -150,6 +116,40 @@ class UDATrainer(Trainer):
                                                      pin_memory=self.args.pin_memory,
                                                      drop_last=True)
         self.dataloader.val_loader = self.target_val_dataloader
+
+        self.aux_dataset_source = {}
+        self.aux_dataloader_source = {}
+        self.aux_dataset_target = {}
+        self.aux_dataloader_target = {}
+        for style in styles_source:
+            self.aux_dataset_source[style] = GTA5_Dataset(args, base_size=args.base_size, crop_size=args.crop_size,
+                                                          data_root_path=datasets_path[style]['data_root_path'],
+                                                          list_path=datasets_path[style]['list_path'],
+                                                          gt_path=datasets_path[style]['gt_path'])
+
+            self.aux_dataloader_source[style] = data.DataLoader(self.aux_dataset_source[style],
+                                                                batch_size=self.args.batch_size,
+                                                                shuffle=False,
+                                                                num_workers=self.args.data_loader_workers,
+                                                                pin_memory=self.args.pin_memory,
+                                                                drop_last=True)
+        for style in styles_target:
+            self.aux_dataset_target[style] = City_Dataset(args,
+                                                          data_root_path=self.datasets_path[style]['data_root_path'],
+                                                          list_path=self.datasets_path[style]['list_path'],
+                                                          gt_path=self.datasets_path[style]['gt_path'],
+                                                          split=args.split,
+                                                          base_size=args.target_base_size,
+                                                          crop_size=args.target_crop_size,
+                                                          class_16=args.class_16,
+                                                          )
+            self.aux_dataloader_target[style] = data.DataLoader(self.aux_dataset_target[style],
+                                                                batch_size=self.args.batch_size,
+                                                                shuffle=False,
+                                                                num_workers=self.args.data_loader_workers,
+                                                                pin_memory=self.args.pin_memory,
+                                                                drop_last=True)
+
         self.dataloader.valid_iterations = (len(target_data_set) + self.args.batch_size) // self.args.batch_size
 
         self.ignore_index = -1
@@ -317,14 +317,14 @@ class UDATrainer(Trainer):
 
         batch_idx = 0  # iter in the data
 
-        batches, data_iters = {}, {}
-        for style in styles_source + styles_target:
-            if style in self.aux_dataloader_source:
-                data_iters[style] = iter(self.aux_dataloader_source[style])
-            elif style in self.aux_dataloader_target:
-                data_iters[style] = iter(self.aux_dataloader_target[style])
+        batches, data_iters_source,data_iters_target = {},{},{}
+        for style in styles_source:
+            data_iters_source[style] = iter(self.aux_dataloader_source[style])
 
-        if epoch > 25:
+        for style in styles_target:
+            data_iters_target[style] = iter(self.aux_dataloader_target[style])
+
+        if args.target_solo_epoch != 0 and epoch >= args.target_solo_epoch:
             self.train_source_Flag = False
             self.logger.info("#####stop train on source,adjust to target only~~###")
         else:
@@ -348,14 +348,14 @@ class UDATrainer(Trainer):
 
             if "source_aug" in args.exp_tag:
                 for style in styles_source:
-                    batches[style] = data_iters[style].next()
+                    batches[style] = data_iters_source[style].next()
                     x_aux, y_aux, _ = batches[style]
                     if self.cuda:
                         x_aux, y_aux = Variable(x_aux).to(self.device), Variable(y_aux).to(device=self.device,
                                                                                            dtype=torch.long)
 
                     pred = self.model(x_aux)
-                    self.train_source(pred, y_aux)
+                    self.train_source(pred, y_aux) # 暂时使得标签相同 todo 后续加上特征层次ASPP对齐
 
             #####################
             # train with target #
@@ -369,7 +369,7 @@ class UDATrainer(Trainer):
 
             if "target_aug" in args.exp_tag:
                 for style in styles_target:
-                    batches[style] = data_iters[style].next()
+                    batches[style] = data_iters_target[style].next()
                     x_aux, _, _ = batches[style]
                     if self.cuda:
                         x_aux = Variable(x_aux).to(self.device)
@@ -379,18 +379,6 @@ class UDATrainer(Trainer):
             self.optimizer.step()
             self.optimizer.zero_grad()
 
-            # if batch_idx % 400 == 0:
-            #     if self.args.multi:
-            #         self.logger.info(
-            #             "epoch{}-batch-{}:loss_seg={:.3f}-loss_target={:.3f}; loss_seg_2={:.3f}-loss_target_2={:.3f}; mask={:.3f}".format(
-            #                 self.current_epoch,
-            #                 batch_idx, self.loss_val.item(), self.loss_target.item(), self.loss_seg_value_2.item(),
-            #                 self.loss_target_2.item(), self.mask.float().mean().item()))
-            #     else:
-            #         self.logger.info("epoch{}-batch-{}:loss_seg={:.3f}-loss_target={:.3f}".format(self.current_epoch,
-            #                                                                                       batch_idx,
-            #                                                                                       self.loss_val.item(),
-            #                                                                                       self.loss_target.item()))
             batch_idx += 1
 
             self.current_iter += 1
@@ -436,6 +424,8 @@ def add_UDA_train_args(arg_parser):
                             help='the ratio of image-wise weighting factor')
     arg_parser.add_argument('--threshold', type=float, default=0.95,
                             help="threshold for Self-produced guidance")
+    arg_parser.add_argument('--target_solo_epoch',type=int, default=0,
+                            help='the epoch to train solely on target')
     return arg_parser
 
 
@@ -461,7 +451,10 @@ if __name__ == '__main__':
         elif "Cityscapes_" in str(f):
             styles_target.append(f.stem)
 
-    # logger.info("styles_souce,style_target", styles_source, styles_target)
+    styles_source=[styles_source[1]]
+    styles_target = [styles_target[1]]
+
+    logger.info("styles_souce,style_target", styles_source, styles_target)
 
     agent = UDATrainer(args=args, cuda=True, train_id=train_id,
                        logger=logger, datasets_path=datasets_path,
