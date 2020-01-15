@@ -374,7 +374,7 @@ class UDATrainer(Trainer):
                     if self.cuda:
                         x_aux = Variable(x_aux).to(self.device)
                     pred = self.model(x_aux)
-                    self.train_target(pred)
+                    self.train_target(pred) # 暂时使得标签相同 todo 后续加上特征层次ASPP对齐
 
             self.optimizer.step()
             self.optimizer.zero_grad()
@@ -451,8 +451,15 @@ if __name__ == '__main__':
         elif "Cityscapes_" in str(f):
             styles_target.append(f.stem)
 
-    styles_source=[styles_source[1]]
-    styles_target = [styles_target[1]]
+    if 'source_aug' in args.exp_tag:
+        styles_source=[styles_source[1]]
+    else:
+        styles_source = []
+
+    if 'target_aug' in args.exp_tag:
+        styles_target = [styles_target[1]]
+    else:
+        styles_target = []
 
     logger.info("styles_souce,style_target", styles_source, styles_target)
 
