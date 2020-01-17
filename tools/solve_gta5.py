@@ -57,7 +57,7 @@ class UDATrainer(Trainer):
                                            crop_size=args.crop_size)
         self.source_dataloader = data.DataLoader(source_data_set,
                                                  batch_size=self.args.batch_size,
-                                                 shuffle=False,
+                                                 shuffle=True,
                                                  num_workers=self.args.data_loader_workers,
                                                  pin_memory=self.args.pin_memory,
                                                  drop_last=True)
@@ -97,7 +97,7 @@ class UDATrainer(Trainer):
                                        class_16=args.class_16)
         self.target_dataloader = data.DataLoader(target_data_set,
                                                  batch_size=self.args.batch_size,
-                                                 shuffle=False,
+                                                 shuffle=True,
                                                  num_workers=self.args.data_loader_workers,
                                                  pin_memory=self.args.pin_memory,
                                                  drop_last=True)
@@ -129,7 +129,7 @@ class UDATrainer(Trainer):
 
             self.aux_dataloader_source[style] = data.DataLoader(self.aux_dataset_source[style],
                                                                 batch_size=self.args.batch_size,
-                                                                shuffle=False,
+                                                                shuffle=True,
                                                                 num_workers=self.args.data_loader_workers,
                                                                 pin_memory=self.args.pin_memory,
                                                                 drop_last=True)
@@ -145,7 +145,7 @@ class UDATrainer(Trainer):
                                                           )
             self.aux_dataloader_target[style] = data.DataLoader(self.aux_dataset_target[style],
                                                                 batch_size=self.args.batch_size,
-                                                                shuffle=False,
+                                                                shuffle=True,
                                                                 num_workers=self.args.data_loader_workers,
                                                                 pin_memory=self.args.pin_memory,
                                                                 drop_last=True)
@@ -291,7 +291,7 @@ class UDATrainer(Trainer):
             self.current_round += 1
 
     def train_one_epoch(self,epoch=0):
-        self.save_shuffled_list()  # shuffle the id.txt every epoch
+        # self.save_shuffled_list()  # shuffle the id.txt every epoch
 
         tqdm_epoch = tqdm(zip(self.source_dataloader, self.target_dataloader),
                           total=self.dataloader.num_iterations,
@@ -452,12 +452,12 @@ if __name__ == '__main__':
             styles_target.append(f.stem)
 
     if 'source_aug' in args.exp_tag:
-        styles_source=[styles_source[1]]
+        styles_source=[styles_source[4]]
     else:
         styles_source = []
 
     if 'target_aug' in args.exp_tag:
-        styles_target = [styles_target[1]]
+        styles_target = [styles_target[2]]
     else:
         styles_target = []
 

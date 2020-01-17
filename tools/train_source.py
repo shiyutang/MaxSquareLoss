@@ -599,7 +599,7 @@ def add_train_args(arg_parser):
                             help='base size of target image')
     arg_parser.add_argument('--num_classes', default=19, type=int,
                             help='num class of mask')
-    arg_parser.add_argument('--data_loader_workers', default=4, type=int,
+    arg_parser.add_argument('--data_loader_workers', default=1, type=int,
                             help='num_workers of Dataloader')
     arg_parser.add_argument('--pin_memory', default=2, type=int,
                             help='pin_memory of Dataloader')
