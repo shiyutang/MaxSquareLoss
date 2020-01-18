@@ -318,8 +318,8 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
     content_tf = test_transform(content_size,crop)
     style_tf = test_transform(style_size,crop)
 
-    for i,content_path in enumerate(content_paths):
-        out_name = output_dir / "{}.{}".format(i, save_ext)
+    for i,content_path in enumerate(tqdm(content_paths)):
+        out_name = Path.joinpath(output_dir,str(content_path.stem)+".{}".format(save_ext))
         if out_name.exists():
             continue
         if do_interpolation:
@@ -354,24 +354,22 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
 
 
 
-
-
 if __name__ == '__main__':
-    # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/Cityscapes/leftImg8bit/train").glob("*")]
-    content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][12500:]
-    exp_tag = "GTA"
+    content_dirs = [f for f in Path("/data/Projects/ADVENT/data/Cityscapes/leftImg8bit/val").glob("*")]
+    # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][12500:]
+    exp_tag = "cityscape"
     style_interpolation_weight = "1,1,1,1"
 
     style_dir= Path("/data/Projects/MaxSquareLoss/imagenet_style/ambulance")#style_dirs[4]
     print("style_dir",style_dir)
     style = random.sample([p for p in style_dir.glob("*")],4)
-    for content in tqdm(content_dirs):
-        style_transfer_AdaIN(content=content, content_dir=None, style=style, style_dir=None,
+    for content_dir in tqdm(content_dirs):
+        style_transfer_AdaIN(content=None, content_dir=content_dir, style=style, style_dir=None,
                              vgg_pretrain="/data/Projects/pytorch-AdaIN/models/vgg_normalised.pth",
                              decoder_pretrain="/data/Projects/pytorch-AdaIN/models/decoder.pth",
                              vgg=vgg,decoder=decoder,do_interpolation=False,
                              content_size=(1052, 1914), style_size=(1052, 1914), crop=None, save_ext="png",
-                             output_path="/data/Projects/ADVENT/data/GTA5_{}/images".\
-                                            format(style_dir.stem),
+                             output_path="/data/Projects/ADVENT/data/Cityscapes_{}_newsize/leftImg8bit/val/{}".\
+                                            format(style_dir.stem,content_dir.stem),
                              preserve_color=None, alpha=1.0,
                              style_interpolation_weight=style_interpolation_weight, exp_tag=exp_tag)

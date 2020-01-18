@@ -32,9 +32,9 @@ datasets_path={
                    'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
                    'image_path': '/data/Projects/ADVENT/data/Cityscapes_accordion/leftImg8bit',
                    'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
-    'Cityscapes_ambulance': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance',
+    'Cityscapes_ambulance_newsize': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_newsize',
                    'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
-                   'image_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance/leftImg8bit',
+                   'image_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_newsize/leftImg8bit',
                    'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
     'Cityscapes_church': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_church',
                    'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
@@ -134,16 +134,19 @@ class Trainer():
             self.optimizer = torch.optim.Adam(params, betas=(0.9, 0.99), weight_decay=self.args.weight_decay)
 
         # dataloader
-        if self.args.dataset=="cityscapes":
-            self.dataloader = City_DataLoader(self.args, datasets_path=datasets_path['cityscapes'])
-        elif self.args.dataset=="gta5":
-            self.dataloader = GTA5_DataLoader(self.args, datasets_path=datasets_path['gta5'])
-        else:
+        if self.args.dataset=="cityscapes" or 'Cityscapes' in self.args.dataset:
+            self.dataloader = City_DataLoader(self.args, datasets_path=datasets_path[self.args.dataset])
+        elif self.args.dataset=="gta5" or 'GTA5' in self.args.dataset:
+            self.dataloader = GTA5_DataLoader(self.args, datasets_path=datasets_path[self.args.dataset])
+        elif self.args.dataset=='synthia':
             self.dataloader = SYNTHIA_DataLoader(self.args,datasets_path['synthia'])
         self.dataloader.num_iterations = min(self.dataloader.num_iterations, ITER_MAX)
         print(self.args.iter_max, self.dataloader.num_iterations)
         self.epoch_num = ceil(self.args.iter_max / self.dataloader.num_iterations) if self.args.iter_stop is None else \
                             ceil(self.args.iter_stop / self.dataloader.num_iterations)
+
+        self.logger.info('I am loading training data and validation data from {}'.\
+                         format(datasets_path[self.args.dataset]['data_root_path']))
 
     def main(self):
         # display args details
@@ -153,10 +156,10 @@ class Trainer():
 
 
         # load pretrained checkpoint
-        if self.args.checkpoint_dir is not None:
+        if self.args.checkpoint_dir is not None:  # restore from trained GTA
             self.args.pretrained_ckpt_file = os.path.join(self.args.checkpoint_dir, self.restore_id + 'best.pth')
             self.load_checkpoint(self.args.pretrained_ckpt_file)
-        
+
         if self.args.continue_training:
             self.load_checkpoint(os.path.join(self.args.checkpoint_dir, self.restore_id + 'best.pth'))
             self.best_iter = self.current_iter         # the best iteration for target
@@ -589,13 +592,13 @@ def add_train_args(arg_parser):
     # dataset related arguments
     arg_parser.add_argument('--dataset', default='cityscapes', type=str,
                             help='dataset choice')
-    arg_parser.add_argument('--base_size', default="1280,720", type=str,
+    arg_parser.add_argument('--base_size', default="1280,720", type=str, # for random crop
                             help='crop size of image')
     arg_parser.add_argument('--crop_size', default="1280,720", type=str,
                             help='base size of image')
-    arg_parser.add_argument('--target_base_size', default="1024,512", type=str,
+    arg_parser.add_argument('--target_base_size', default="1280,720", type=str, # for random crop
                             help='crop size of target image')
-    arg_parser.add_argument('--target_crop_size', default="1280,640", type=str,
+    arg_parser.add_argument('--target_crop_size', default="1280,720", type=str,
                             help='base size of target image')
     arg_parser.add_argument('--num_classes', default=19, type=int,
                             help='num class of mask')

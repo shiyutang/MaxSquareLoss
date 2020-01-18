@@ -2,18 +2,10 @@
 <project version="4">
   <component name="PublishConfigData" uploadOnCheckin="2fe30f26-fa39-4e47-b1e2-8c36b1b4915b">
     <serverData>
-      <paths name="shiyuMegvii">
+      <paths name="MEGVII-shiyu">
         <serverdata>
           <mappings>
             <mapping deploy="/data/Projects/MaxSquareLoss" local="$PROJECT_DIR$" web="/" />
-            <mapping deploy="/data/Projects/ADVENT" local="$PROJECT_DIR$/../ADVENT-master" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="shiyucloud">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>

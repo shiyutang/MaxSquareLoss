@@ -1,19 +1,4 @@
 import os
-import random
-import logging
-import argparse
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
-from tqdm import tqdm
-import numpy as np
-from math import ceil, floor
-from distutils.version import LooseVersion
-from tensorboardX import SummaryWriter
-from torchvision.utils import make_grid
-import torch.utils.data as data
-from torch.autograd import Variable
 
 import sys
 from pathlib import Path
@@ -39,121 +24,72 @@ class UDATrainer(Trainer):
         self.styles_source = styles_source
         self.styles_target = styles_target
         ## source train loader
-        if self.args.source_dataset == 'synthia':
-            source_data_set = SYNTHIA_Dataset(args,
-                                              data_root_path=args.source_data_path,
-                                              list_path=args.source_list_path,
-                                              split=args.source_split,
-                                              base_size=args.base_size,
-                                              crop_size=args.crop_size,
-                                              class_16=args.class_16)
-        else:
-            source_data_set = GTA5_Dataset(args,
-                                           data_root_path=args.source_data_path,
-                                           list_path=args.source_list_path,
-                                           gt_path=self.datasets_path['gta5']['gt_path'],
-                                           split=args.source_split,
-                                           base_size=args.base_size,
-                                           crop_size=args.crop_size)
-        self.source_dataloader = data.DataLoader(source_data_set,
-                                                 batch_size=self.args.batch_size,
-                                                 shuffle=True,
-                                                 num_workers=self.args.data_loader_workers,
-                                                 pin_memory=self.args.pin_memory,
-                                                 drop_last=True)
+
+        source_trans_data_set = GTA5_Dataset(args,
+                               data_root_path=self.datasets_path[self.styles_source[0]]['data_root_path'],
+                               list_path=self.datasets_path[self.styles_source[0]]['list_path'],
+                               gt_path=self.datasets_path[self.styles_source[0]]['gt_path'],
+                               split='train',
+                               base_size=args.base_size,
+                               crop_size=args.crop_size)
+        self.source_trans_dataloader = \
+            data.DataLoader(source_trans_data_set,
+                           batch_size=self.args.batch_size,
+                           shuffle=True,
+                           num_workers=self.args.data_loader_workers,
+                           pin_memory=self.args.pin_memory,
+                           drop_last=True)
+
         ## source validation loader
-        if self.args.source_dataset == 'synthia':
-            source_data_set = SYNTHIA_Dataset(args,
-                                              data_root_path=args.source_data_path,
-                                              list_path=args.source_list_path,
-                                              split='val',
-                                              base_size=args.base_size,
-                                              crop_size=args.crop_size,
-                                              class_16=args.class_16)
-        else:
-            source_data_set = GTA5_Dataset(args,
-                                           data_root_path=args.source_data_path,
-                                           list_path=args.source_list_path,
-                                           gt_path=self.datasets_path['gta5']['gt_path'],
-                                           split='val',
-                                           base_size=args.base_size,
-                                           crop_size=args.crop_size)
-        self.source_val_dataloader = data.DataLoader(source_data_set,
-                                                     batch_size=self.args.batch_size,
-                                                     shuffle=False,
-                                                     num_workers=self.args.data_loader_workers,
-                                                     pin_memory=self.args.pin_memory,
-                                                     drop_last=True)
-        print(self.args.source_dataset, self.args.target_dataset)
+        source_trans_data_set = GTA5_Dataset(args,
+                                       data_root_path=self.datasets_path[self.styles_source[0]]['data_root_path'],
+                                       list_path=self.datasets_path[self.styles_source[0]]['list_path'],
+                                       gt_path=self.datasets_path[self.styles_source[0]]['gt_path'],
+                                       split='val',
+                                       base_size=args.base_size,
+                                       crop_size=args.crop_size)
+        self.source_trans_val_dataloader = data.DataLoader(source_trans_data_set,
+                                                           batch_size=self.args.batch_size,
+                                                           shuffle=False,
+                                                           num_workers=self.args.data_loader_workers,
+                                                           pin_memory=self.args.pin_memory,
+                                                           drop_last=True)
 
         ## target dataset train and validation
-        target_data_set = City_Dataset(args,
-                                       data_root_path=self.datasets_path["cityscapes"]['data_root_path'],
-                                       list_path=self.datasets_path["cityscapes"]['list_path'],
-                                       gt_path=self.datasets_path['cityscapes']['gt_path'],
-                                       split=args.split,
-                                       base_size=args.target_base_size,
-                                       crop_size=args.target_crop_size,
-                                       class_16=args.class_16)
-        self.target_dataloader = data.DataLoader(target_data_set,
-                                                 batch_size=self.args.batch_size,
-                                                 shuffle=True,
-                                                 num_workers=self.args.data_loader_workers,
-                                                 pin_memory=self.args.pin_memory,
-                                                 drop_last=True)
-        target_data_set = City_Dataset(args,
-                                       data_root_path=self.datasets_path["cityscapes"]['data_root_path'],
-                                       list_path=self.datasets_path["cityscapes"]['list_path'],
-                                       gt_path=self.datasets_path['cityscapes']['gt_path'],
-                                       split='val',
-                                       base_size=args.target_base_size,
-                                       crop_size=args.target_crop_size,
-                                       class_16=args.class_16)
-        self.target_val_dataloader = data.DataLoader(target_data_set,
+        target_trans_data_set =\
+            City_Dataset(args,
+                       data_root_path=self.datasets_path[self.datasets_path[self.styles_target[0]]]['data_root_path'],
+                       list_path=self.datasets_path[self.styles_target[0]]['list_path'],
+                       gt_path=self.datasets_path[self.styles_target[0]]['gt_path'],
+                       split='train',
+                       base_size=args.target_base_size,
+                       crop_size=args.target_crop_size,
+                       class_16=args.class_16)
+        self.target_trans_dataloader = data.DataLoader(target_trans_data_set,
+                                                       batch_size=self.args.batch_size,
+                                                       shuffle=True,
+                                                       num_workers=self.args.data_loader_workers,
+                                                       pin_memory=self.args.pin_memory,
+                                                       drop_last=True)
+        target_trans_data_set =             \
+            City_Dataset(args,
+                       data_root_path=self.datasets_path[self.datasets_path[self.styles_target[0]]]['data_root_path'],
+                       list_path=self.datasets_path[self.styles_target[0]]['list_path'],
+                       gt_path=self.datasets_path[self.styles_target[0]]['gt_path'],
+                       split='val',
+                       base_size=args.target_base_size,
+                       crop_size=args.target_crop_size,
+                       class_16=args.class_16)
+        self.target_val_dataloader = data.DataLoader(target_trans_data_set,
                                                      batch_size=self.args.batch_size,
                                                      shuffle=False,
                                                      num_workers=self.args.data_loader_workers,
                                                      pin_memory=self.args.pin_memory,
                                                      drop_last=True)
+
         self.dataloader.val_loader = self.target_val_dataloader
 
-        self.aux_dataset_source = {}
-        self.aux_dataloader_source = {}
-        self.aux_dataset_target = {}
-        self.aux_dataloader_target = {}
-        for style in styles_source:
-            self.aux_dataset_source[style] = \
-                GTA5_Dataset(args, base_size=args.base_size, crop_size=args.crop_size,
-                          data_root_path=datasets_path[style]['data_root_path'],
-                          list_path=datasets_path[style]['list_path'],
-                          gt_path=datasets_path[style]['gt_path'])
-
-            self.aux_dataloader_source[style] = \
-                data.DataLoader(self.aux_dataset_source[style],
-                                batch_size=self.args.batch_size,
-                                shuffle=True,
-                                num_workers=self.args.data_loader_workers,
-                                pin_memory=self.args.pin_memory,
-                                drop_last=True)
-        for style in styles_target:
-            self.aux_dataset_target[style] = \
-                City_Dataset(args,
-                          data_root_path=self.datasets_path[style]['data_root_path'],
-                          list_path=self.datasets_path[style]['list_path'],
-                          gt_path=self.datasets_path[style]['gt_path'],
-                          split=args.split,
-                          base_size=args.target_base_size,
-                          crop_size=args.target_crop_size,
-                          class_16=args.class_16)
-            self.aux_dataloader_target[style] = \
-                data.DataLoader(self.aux_dataset_target[style],
-                                batch_size=self.args.batch_size,
-                                shuffle=True,
-                                num_workers=self.args.data_loader_workers,
-                                pin_memory=self.args.pin_memory,
-                                drop_last=True)
-
-        self.dataloader.valid_iterations = (len(target_data_set) + self.args.batch_size) // self.args.batch_size
+        self.dataloader.valid_iterations = (len(target_trans_data_set) + self.args.batch_size) // self.args.batch_size
 
         self.ignore_index = -1
         if self.args.target_mode == "hard":
@@ -261,8 +197,7 @@ class UDATrainer(Trainer):
             self.best_iter = 0
             self.current_iter = 0
             self.current_epoch = 0
-
-        if self.args.continue_training:
+        else:
             self.load_checkpoint(os.path.join(self.args.checkpoint_dir, self.restore_id + 'final.pth'))
             self.best_iter = self.current_iter  # the best iteration for target
             self.best_source_iter = self.current_iter  # the best iteration for source
@@ -296,10 +231,10 @@ class UDATrainer(Trainer):
     def train_one_epoch(self,epoch=0):
         # self.save_shuffled_list()  # shuffle the id.txt every epoch
 
-        tqdm_epoch = tqdm(zip(self.source_dataloader, self.target_dataloader),
+        tqdm_epoch = tqdm(zip(self.source_trans_dataloader, self.target_trans_dataloader),
                           total=self.dataloader.num_iterations,
-                          desc="Train Round-{}-Epoch-{}-total-{}".format(self.current_round,
-                                                                         self.current_epoch + 1, self.epoch_num))
+                          desc="Train Round-{}-Epoch-{}-total-{}".\
+                          format(self.current_round,self.current_epoch + 1, self.epoch_num))
         self.logger.info("Training one epoch... in the method defined by solve_gta5")
         self.Eval.reset()
 
@@ -320,27 +255,6 @@ class UDATrainer(Trainer):
 
         batch_idx = 0  # iter in the data
 
-        batches, data_iters_source,data_iters_target = {},{},{}
-        for style in styles_source:
-            data_iters_source[style] = iter(self.aux_dataloader_source[style])
-
-        for style in styles_target:
-            data_iters_target[style] = iter(self.aux_dataloader_target[style])
-
-        if args.target_solo_epoch != 0 and epoch >= args.target_solo_epoch:
-            self.train_source_Flag = False
-            self.logger.info("#####stop train on source,adjust to target only~~###")
-        elif "saug_only" in args.exp_tag:
-            self.train_source_Flag = False
-            self.logger.info("#####train on transferred source only###")
-        else:
-            self.train_source_Flag = True
-
-        if "taug_only" in args.exp_tag:
-            self.train_target_Flag =False
-            self.logger.info("#####train on transferred target only###")
-        else:
-            self.train_target_Flag = True
 
         for batch_s, batch_t in tqdm_epoch:
             self.poly_lr_scheduler(optimizer=self.optimizer, init_lr=self.args.lr)
@@ -350,44 +264,22 @@ class UDATrainer(Trainer):
             # source supervised loss #
             ##########################
             # train with source
-            if self.train_source_Flag:
-                x, y, _ = batch_s
-                if self.cuda:
-                    x, y = Variable(x).to(self.device), Variable(y).to(device=self.device, dtype=torch.long)
+            x, y, _ = batch_s
+            if self.cuda:
+                x, y = Variable(x).to(self.device), Variable(y).to(device=self.device, dtype=torch.long)
 
-                pred = self.model(x)
-                self.train_source(pred, y)
-
-            if "source_aug" in args.exp_tag or "saug_only" in args.exp_tag:
-                for style in styles_source:
-                    batches[style] = data_iters_source[style].next()
-                    x_aux, y_aux, _ = batches[style]
-                    if self.cuda:
-                        x_aux, y_aux = Variable(x_aux).to(self.device), Variable(y_aux).to(device=self.device,
-                                                                                           dtype=torch.long)
-
-                    pred = self.model(x_aux)
-                    self.train_source(pred, y_aux) # 暂时使得标签相同 todo 后续加上特征层次ASPP对齐
+            pred = self.model(x)
+            self.train_source(pred, y)
 
             #####################
             # train with target #
             #####################
-            if self.train_target_Flag:
-                x, _, _ = batch_t
-                if self.cuda:
-                    x = Variable(x).to(self.device)
-                pred = self.model(x)
+            x, _, _ = batch_t
+            if self.cuda:
+                x = Variable(x).to(self.device)
+            pred = self.model(x)
 
-                self.train_target(pred)
-
-            if "target_aug" in args.exp_tag or "taug_only" in args.exp_tag:
-                for style in styles_target:
-                    batches[style] = data_iters_target[style].next()
-                    x_aux, _, _ = batches[style]
-                    if self.cuda:
-                        x_aux = Variable(x_aux).to(self.device)
-                    pred = self.model(x_aux)
-                    self.train_target(pred) # 暂时使得标签相同 todo 后续加上特征层次ASPP对齐
+            self.train_target(pred)
 
             self.optimizer.step()
             self.optimizer.zero_grad()
@@ -464,15 +356,8 @@ if __name__ == '__main__':
         elif "Cityscapes_" in str(f):
             styles_target.append(f.stem)
 
-    if 'source_aug' in args.exp_tag or "saug" in args.exp_tag:
-        styles_source=[styles_source[4]]
-    else:
-        styles_source = []
-
-    if 'target_aug' in args.exp_tag or "taug" in args.exp_tag:
-        styles_target = [styles_target[2]]
-    else:
-        styles_target = []
+    styles_source=['GTA5_ambulance']
+    styles_target = ['Cityscapes_ambulance_newsize']
 
     logger.info("styles_souce,style_target", styles_source, styles_target)
 
