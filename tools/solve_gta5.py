@@ -327,8 +327,17 @@ class UDATrainer(Trainer):
         if args.target_solo_epoch != 0 and epoch >= args.target_solo_epoch:
             self.train_source_Flag = False
             self.logger.info("#####stop train on source,adjust to target only~~###")
+        elif "saug_only" in args.exp_tag:
+            self.train_source_Flag = False
+            self.logger.info("#####train on transferred source only###")
         else:
             self.train_source_Flag = True
+
+        if "taug_only" in args.exp_tag:
+            self.train_target_Flag =False
+            self.logger.info("#####train on transferred target only###")
+        else:
+            self.train_target_Flag = True
 
         for batch_s, batch_t in tqdm_epoch:
             self.poly_lr_scheduler(optimizer=self.optimizer, init_lr=self.args.lr)
@@ -346,7 +355,7 @@ class UDATrainer(Trainer):
                 pred = self.model(x)
                 self.train_source(pred, y)
 
-            if "source_aug" in args.exp_tag:
+            if "source_aug" in args.exp_tag or "saug_only" in args.exp_tag:
                 for style in styles_source:
                     batches[style] = data_iters_source[style].next()
                     x_aux, y_aux, _ = batches[style]
@@ -360,14 +369,15 @@ class UDATrainer(Trainer):
             #####################
             # train with target #
             #####################
-            x, _, _ = batch_t
-            if self.cuda:
-                x = Variable(x).to(self.device)
-            pred = self.model(x)
+            if self.train_target_Flag:
+                x, _, _ = batch_t
+                if self.cuda:
+                    x = Variable(x).to(self.device)
+                pred = self.model(x)
 
-            self.train_target(pred)
+                self.train_target(pred)
 
-            if "target_aug" in args.exp_tag:
+            if "target_aug" in args.exp_tag or "taug_only" in args.exp_tag:
                 for style in styles_target:
                     batches[style] = data_iters_target[style].next()
                     x_aux, _, _ = batches[style]
@@ -451,12 +461,12 @@ if __name__ == '__main__':
         elif "Cityscapes_" in str(f):
             styles_target.append(f.stem)
 
-    if 'source_aug' in args.exp_tag:
+    if 'source_aug' in args.exp_tag or "saug" in args.exp_tag:
         styles_source=[styles_source[4]]
     else:
         styles_source = []
 
-    if 'target_aug' in args.exp_tag:
+    if 'target_aug' in args.exp_tag or "taug" in args.exp_tag:
         styles_target = [styles_target[2]]
     else:
         styles_target = []
