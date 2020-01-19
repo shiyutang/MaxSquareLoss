@@ -355,12 +355,12 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
 
 
 if __name__ == '__main__':
-    content_dirs = [f for f in Path("/data/Projects/ADVENT/data/Cityscapes/leftImg8bit/val").glob("*")]
+    content_dirs = [f for f in Path("/data/Projects/ADVENT/data/Cityscapes/leftImg8bit/train").glob("*")][9:]
     # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][12500:]
     exp_tag = "cityscape"
     style_interpolation_weight = "1,1,1,1"
 
-    style_dir= Path("/data/Projects/MaxSquareLoss/imagenet_style/ambulance")#style_dirs[4]
+    style_dir= Path("/data/Projects/MaxSquareLoss/imagenet_style/ambulance") #style_dirs[4]
     print("style_dir",style_dir)
     style = random.sample([p for p in style_dir.glob("*")],4)
     for content_dir in tqdm(content_dirs):
@@ -369,7 +369,7 @@ if __name__ == '__main__':
                              decoder_pretrain="/data/Projects/pytorch-AdaIN/models/decoder.pth",
                              vgg=vgg,decoder=decoder,do_interpolation=False,
                              content_size=(1052, 1914), style_size=(1052, 1914), crop=None, save_ext="png",
-                             output_path="/data/Projects/ADVENT/data/Cityscapes_{}_newsize/leftImg8bit/val/{}".\
+                             output_path="/data/Projects/ADVENT/data/Cityscapes_{}_newsize/leftImg8bit/train/{}".\
                                             format(style_dir.stem,content_dir.stem),
                              preserve_color=None, alpha=1.0,
                              style_interpolation_weight=style_interpolation_weight, exp_tag=exp_tag)

@@ -58,7 +58,7 @@ class UDATrainer(Trainer):
         ## target dataset train and validation
         target_trans_data_set =\
             City_Dataset(args,
-                       data_root_path=self.datasets_path[self.datasets_path[self.styles_target[0]]]['data_root_path'],
+                       data_root_path=self.datasets_path[self.styles_target[0]]['data_root_path'],
                        list_path=self.datasets_path[self.styles_target[0]]['list_path'],
                        gt_path=self.datasets_path[self.styles_target[0]]['gt_path'],
                        split='train',
@@ -73,7 +73,7 @@ class UDATrainer(Trainer):
                                                        drop_last=True)
         target_trans_data_set =             \
             City_Dataset(args,
-                       data_root_path=self.datasets_path[self.datasets_path[self.styles_target[0]]]['data_root_path'],
+                       data_root_path=self.datasets_path[self.styles_target[0]]['data_root_path'],
                        list_path=self.datasets_path[self.styles_target[0]]['list_path'],
                        gt_path=self.datasets_path[self.styles_target[0]]['gt_path'],
                        split='val',
@@ -187,9 +187,8 @@ class UDATrainer(Trainer):
             self.logger.info("{:16} {}".format(key, val))
 
         # load pretrained checkpoint
-        if self.args.pretrained_ckpt_file is not None:
-            if os.path.isdir(self.args.pretrained_ckpt_file):
-                self.args.pretrained_ckpt_file = os.path.join(self.args.checkpoint_dir, self.restore_id + 'best.pth')
+        if self.args.checkpoint_dir is not None:
+            self.args.pretrained_ckpt_file = os.path.join(self.args.checkpoint_dir, self.restore_id + 'best.pth')
             self.load_checkpoint(self.args.pretrained_ckpt_file)
 
         if not self.args.continue_training:
@@ -293,6 +292,7 @@ class UDATrainer(Trainer):
         self.writer.add_scalar('target_loss', self.loss_target_value, self.current_epoch)
         tqdm.write("The average target_loss of train epoch-{}-:{:.3f}".format(self.current_epoch, self.loss_target_value))
         if self.args.multi:
+            self.writer.add_scalar('train_loss_2', self.loss_seg_value_2, self.current_epoch)
             self.writer.add_scalar('train_loss_2', self.loss_seg_value_2, self.current_epoch)
             tqdm.write("The average loss_2 of train epoch-{}-:{}".format(self.current_epoch, self.loss_seg_value_2))
             self.writer.add_scalar('target_loss_2', self.loss_target_value_2, self.current_epoch)

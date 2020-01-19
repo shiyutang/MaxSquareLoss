@@ -407,7 +407,7 @@ class Trainer():
         self.logger.info('\nvalidating source domain...')
         self.Eval.reset()
         with torch.no_grad():
-            tqdm_batch = tqdm(self.source_val_dataloader, total=self.dataloader.valid_iterations,
+            tqdm_batch = tqdm(self.source_trans_val_dataloader, total=self.dataloader.valid_iterations,
                               desc="Source Val Epoch-{}-".format(self.current_epoch + 1))
             self.model.eval()
             i = 0
