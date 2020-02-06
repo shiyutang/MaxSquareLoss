@@ -356,8 +356,8 @@ if __name__ == '__main__':
         elif "Cityscapes_" in str(f):
             styles_target.append(f.stem)
 
-    styles_source=['GTA5_ambulance']
-    styles_target = ['Cityscapes_ambulance_newsize']
+    styles_source=['GTA5_ambulance_styleRetrain']
+    styles_target = ['Cityscapes_ambulance_styleRetrain']
 
     logger.info("styles_souce,style_target", styles_source, styles_target)
 
