@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
-import random
 import scipy.io
 from PIL import Image, ImageOps, ImageFilter, ImageFile
-import numpy as np
-import copy
 import os
 import torch
 import torch.utils.data as data
-import torchvision.transforms as ttransforms
+from pathlib import Path
+from torchvision import transforms
 
 from datasets.cityscapes_Dataset import City_Dataset, City_DataLoader
 
@@ -20,8 +18,8 @@ class GTA5_Dataset(City_Dataset):
                  list_path='./datasets/GTA5/list',
                  gt_path = None,
                  split='train',
-                 base_size=769,
-                 crop_size=769,
+                 base_size=769,  ## for random crop
+                 crop_size=769,  ## for resize
                  training=True):
 
         self.args = args
@@ -127,4 +125,30 @@ class GTA5_DataLoader():
         self.num_iterations = (len(data_set) + self.args.batch_size) // self.args.batch_size
 
 
-        
+class FlatFolderDataset(data.Dataset):
+    def __init__(self, root, transform):
+        super(FlatFolderDataset, self).__init__()
+        self.root = root
+        self.paths = list(Path(self.root).glob('*'))
+        self.transform = transform
+
+    def __getitem__(self, index):
+        path = self.paths[index]
+        img = Image.open(str(path)).convert('RGB')
+        img = self.transform(img)
+        return img
+
+    def __len__(self):
+        return len(self.paths)
+
+    def name(self):
+        return 'FlatFolderDataset'
+
+
+def train_transform():
+    transform_list = [
+        transforms.Resize(size=(1024, 512)),
+        # transforms.RandomCrop(256),
+        transforms.ToTensor()
+    ]
+    return transforms.Compose(transform_list)

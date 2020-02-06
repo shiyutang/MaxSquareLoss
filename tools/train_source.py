@@ -89,6 +89,7 @@ ITER_MAX = 5000
 class Trainer():
     def __init__(self, args, cuda=None, train_id="None", logger=None):
         self.args = args
+        self.datasets_path = datasets_path
         if torch.cuda.device_count()==1:
             os.environ["CUDA_VISIBLE_DEVICES"] = self.args.gpu
         self.cuda = cuda and torch.cuda.is_available()
@@ -115,7 +116,7 @@ class Trainer():
         self.loss.to(self.device) # loss 也需要去一个device
 
         # model
-        self.model, params = get_model(self.args)
+        self.model, self.params = get_model(self.args)
         if torch.cuda.device_count()>1:
             print("let us use {} GPUs".format(torch.cuda.device_count()))
             self.model = nn.DataParallel(self.model)
@@ -127,12 +128,12 @@ class Trainer():
         # optimizer
         if self.args.optim == "SGD":
             self.optimizer = torch.optim.SGD(
-                params=params,
+                params=self.params,
                 momentum=self.args.momentum,
                 weight_decay=self.args.weight_decay
             )
         elif self.args.optim == "Adam":
-            self.optimizer = torch.optim.Adam(params, betas=(0.9, 0.99), weight_decay=self.args.weight_decay)
+            self.optimizer = torch.optim.Adam(self.params, betas=(0.9, 0.99), weight_decay=self.args.weight_decay)
 
         # dataloader
         if self.args.dataset=="cityscapes" or 'Cityscapes' in self.args.dataset:
@@ -549,6 +550,8 @@ class Trainer():
         optimizer.param_groups[0]["lr"] = new_lr
         if len(optimizer.param_groups) == 2:
             optimizer.param_groups[1]["lr"] = 10 * new_lr
+        if len(optimizer.param_groups) == 3:
+            optimizer.param_groups[2]["lr"] = new_lr
 
 
 def add_train_args(arg_parser):
@@ -652,7 +655,6 @@ def init_args(args):
 
     print("batch size: ", args.batch_size)
 
-    # train_id = str(args.dataset)
     train_id = args.exp_tag
     if not os.path.exists(args.save_dir):
         os.mkdir(args.save_dir)
