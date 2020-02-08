@@ -94,7 +94,7 @@ class SYNTHIA_DataLoader():
                                 crop_size=args.crop_size,
                                 training=training)
 
-        if self.args.split == "train" or self.args.split == "trainval" or self.args.split =="all":
+        if "train"  in self.args.split:
             self.data_loader = data.DataLoader(data_set,
                                                batch_size=self.args.batch_size,
                                                shuffle=True,

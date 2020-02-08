@@ -14,6 +14,15 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 IMG_MEAN = np.array((104.00698793, 116.66876762, 122.67891434), dtype=np.float32)
 NUM_CLASSES = 19
 
+def style_transform():
+    transform_list = [
+        ttransforms.Resize(size=(512, 1024)),
+        # transforms.RandomCrop(256),
+        ttransforms.ToTensor()
+    ]
+    return ttransforms.Compose(transform_list)
+
+
 # colour map
 label_colours = [
         # [  0,   0,   0],
@@ -76,7 +85,10 @@ class City_Dataset(data.Dataset):
         self.resize = args.resize
         self.gaussian_blur = args.gaussian_blur
 
-        item_list_filepath = os.path.join(self.list_path, self.split+".txt")
+        if 'train' in self.split:
+            item_list_filepath = os.path.join(self.list_path, 'train'+".txt")
+        elif "val" in self.split:
+            item_list_filepath = os.path.join(self.list_path, 'val'+".txt")
 
         # self.image_filepath = os.path.join(self.data_path, "leftImg8bit")
 
@@ -136,12 +148,15 @@ class City_Dataset(data.Dataset):
         # print("gt_image_path",gt_image_path)
         gt_image = Image.open(gt_image_path)
 
-        if (self.split == "train" or self.split == "trainval") and self.training:
-            image, gt_image = self._train_sync_transform(image, gt_image)
+        if ("train" in self.split or "trainval" in self.split) and self.training:
+            image_tf, gt_image = self._train_sync_transform(image, gt_image)
         else:
-            image, gt_image = self._val_sync_transform(image, gt_image)
+            image_tf, gt_image = self._val_sync_transform(image, gt_image)
 
-        return image, gt_image, item
+        if 'style' in self.split:
+            image_tf = style_transform()(image)
+
+        return image_tf, gt_image, item
 
     def _train_sync_transform(self, img, mask):
         '''
@@ -189,15 +204,17 @@ class City_Dataset(data.Dataset):
         elif self.resize:
             img = img.resize(self.crop_size, Image.BICUBIC)
             if mask: mask = mask.resize(self.crop_size, Image.NEAREST)
-        
+
         if self.gaussian_blur:
             # gaussian blur as in PSP
             if random.random() < 0.5:
                 img = img.filter(ImageFilter.GaussianBlur(
                     radius=random.random()))
+
         # final transform
         if mask: 
-            img, mask = self._img_transform(img), self._mask_transform(mask)
+            img =  self._img_transform(img)
+            mask =self._mask_transform(mask)
             return img, mask
         else:
             img = self._img_transform(img)
@@ -226,7 +243,8 @@ class City_Dataset(data.Dataset):
             mask = mask.resize(self.crop_size, Image.NEAREST)
 
         # final transform
-        img, mask = self._img_transform(img), self._mask_transform(mask)
+        img = self._img_transform(img)
+        mask = self._mask_transform(mask)
         return img, mask
 
     def _img_transform(self, image):
@@ -270,7 +288,7 @@ class City_DataLoader():
                                 class_16=args.class_16,
                                 class_13=args.class_13)
 
-        if (self.args.split == "train" or self.args.split == "trainval") and training:
+        if ("train" in self.args.split ) and training:
             self.data_loader = data.DataLoader(data_set,
                                                batch_size=self.args.batch_size,
                                                shuffle=True,

@@ -239,7 +239,7 @@ if __name__ == '__main__':
                             help="image_summary")
 
     args = arg_parser.parse_args()
-    if args.split == "train": args.split = "val"
+    if "train" in args.split: args.split = "val"
     if args.checkpoint_dir == "none": args.checkpoint_dir = args.pretrained_ckpt_file + "/eval"
     args, train_id, logger = init_args(args)
     args.batch_size_per_gpu = 2

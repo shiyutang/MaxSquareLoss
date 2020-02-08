@@ -11,6 +11,35 @@ from datasets.cityscapes_Dataset import City_Dataset, City_DataLoader
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
+class FlatFolderDataset(data.Dataset):
+    def __init__(self, root, transform):
+        super(FlatFolderDataset, self).__init__()
+        self.root = root
+        self.paths = list(Path(self.root).glob('*'))
+        self.transform = transform
+
+    def __getitem__(self, index):
+        path = self.paths[index]
+        img = Image.open(str(path)).convert('RGB')
+        img = self.transform(img)
+        return img
+
+    def __len__(self):
+        return len(self.paths)
+
+    def name(self):
+        return 'FlatFolderDataset'
+
+
+def train_transform():
+    transform_list = [
+        transforms.Resize(size=(512, 1024)), # (h,w)
+        # transforms.RandomCrop(256),
+        transforms.ToTensor()
+    ]
+    return transforms.Compose(transform_list)
+
+
 class GTA5_Dataset(City_Dataset):
     def __init__(self,
                  args,
@@ -38,7 +67,11 @@ class GTA5_Dataset(City_Dataset):
         self.resize = args.resize
         self.gaussian_blur = args.gaussian_blur
 
-        item_list_filepath = os.path.join(self.list_path, self.split+".txt")
+        if 'train' in self.split:
+            item_list_filepath = os.path.join(self.list_path, 'train'+".txt")
+        elif "val" in self.split:
+            item_list_filepath = os.path.join(self.list_path, 'val'+".txt")
+
 
         if not os.path.exists(item_list_filepath):
             raise Warning("split must be train/val/trainval/test/all")
@@ -67,12 +100,16 @@ class GTA5_Dataset(City_Dataset):
         gt_image_path = os.path.join(self.gt_filepath, "{:0>5d}.png".format(id))
         gt_image = Image.open(gt_image_path)
 
-        if (self.split == "train" or self.split == "trainval" or self.split =="all") and self.training:
-            image, gt_image = self._train_sync_transform(image, gt_image)
+        if ("train" in self.split) and self.training:
+            image_tf, gt_image = self._train_sync_transform(image, gt_image)
         else:
-            image, gt_image = self._val_sync_transform(image, gt_image)
+            image_tf, gt_image = self._val_sync_transform(image, gt_image)
 
-        return image, gt_image, item
+        if 'style' in self.split:
+            image_tf = train_transform()(image)
+
+
+        return image_tf, gt_image, item
 
 class GTA5_DataLoader():
     def __init__(self, args, training=True,datasets_path=None):
@@ -88,14 +125,14 @@ class GTA5_DataLoader():
                                 crop_size=args.crop_size,
                                 training=training)
 
-        if self.args.split == "train" or self.args.split == "trainval" or self.args.split =="all":
+        if "train" in self.args.split:
             self.data_loader = data.DataLoader(data_set,
                                                batch_size=self.args.batch_size,
                                                shuffle=True,
                                                num_workers=self.args.data_loader_workers,
                                                pin_memory=self.args.pin_memory,
                                                drop_last=True)
-        elif self.args.split =="val" or self.args.split == "test":
+        elif "val" in self.args.split or "test" in self.args.split:
             self.data_loader = data.DataLoader(data_set,
                                                batch_size=self.args.batch_size,
                                                shuffle=False,
@@ -105,7 +142,7 @@ class GTA5_DataLoader():
         else:
             raise Warning("split must be train/val/trainavl/test/all")
 
-        val_split = 'val' if self.args.split == "train" else 'test'
+        val_split = 'val' if "train" in self.args.split else 'test'
         val_set = GTA5_Dataset(args,
                                data_root_path=datasets_path['data_root_path'],
                                list_path=datasets_path['list_path'],
@@ -125,30 +162,3 @@ class GTA5_DataLoader():
         self.num_iterations = (len(data_set) + self.args.batch_size) // self.args.batch_size
 
 
-class FlatFolderDataset(data.Dataset):
-    def __init__(self, root, transform):
-        super(FlatFolderDataset, self).__init__()
-        self.root = root
-        self.paths = list(Path(self.root).glob('*'))
-        self.transform = transform
-
-    def __getitem__(self, index):
-        path = self.paths[index]
-        img = Image.open(str(path)).convert('RGB')
-        img = self.transform(img)
-        return img
-
-    def __len__(self):
-        return len(self.paths)
-
-    def name(self):
-        return 'FlatFolderDataset'
-
-
-def train_transform():
-    transform_list = [
-        transforms.Resize(size=(1024, 512)),
-        # transforms.RandomCrop(256),
-        transforms.ToTensor()
-    ]
-    return transforms.Compose(transform_list)

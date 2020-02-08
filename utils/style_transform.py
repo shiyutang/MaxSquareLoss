@@ -171,7 +171,8 @@ class Net(nn.Module):
         assert 0 <= alpha <= 1
         style_feats = self.encode_with_intermediate(style)
         content_feat = self.encode(content)
-        t = adaptive_instance_normalization(content_feat, style_feats[-1])
+        t = adaptive_instance_normalization(
+                    content_feat, style_feats[-1])
         t = alpha * t + (1 - alpha) * content_feat
 
         g_t = self.decoder(t)
@@ -226,7 +227,6 @@ def coral(source, target):
                         target_f_mean.expand_as(source_f_norm)
 
     return source_f_transfer.view(source.size())
-
 
 
 
@@ -314,7 +314,6 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
 
     vgg.to(device)
     decoder.to(device)
-
 
     content_tf = test_transform(content_size,crop)
     style_tf = test_transform(style_size,crop)

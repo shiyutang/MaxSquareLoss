@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch
+import random
 
 from graphs.models.deeplab_multi import DeeplabMulti
 
@@ -124,13 +125,16 @@ vgg = nn.Sequential(
 
 
 class Net(nn.Module):
-    def __init__(self, encoder, decoder):
+    def __init__(self):
         super(Net, self).__init__()
-        enc_layers = list(encoder.children())
+        vgg.load_state_dict(torch.load("/data/Projects/pytorch-AdaIN/models/vgg_normalised.pth"))
+        enc_layers = list(vgg.children())
         self.enc_1 = nn.Sequential(*enc_layers[:4])  # input -> relu1_1
         self.enc_2 = nn.Sequential(*enc_layers[4:11])  # relu1_1 -> relu2_1
         self.enc_3 = nn.Sequential(*enc_layers[11:18])  # relu2_1 -> relu3_1
         self.enc_4 = nn.Sequential(*enc_layers[18:31])  # relu3_1 -> relu4_1
+        decoder.load_state_dict(
+                torch.load("/data/Projects/pytorch-AdaIN/models/decoder_iter_160000.pth.tar"))
         self.decoder = decoder
         self.mse_loss = nn.MSELoss()
 
@@ -166,29 +170,50 @@ class Net(nn.Module):
         return self.mse_loss(input_mean, target_mean) + \
                self.mse_loss(input_std, target_std)
 
-    def forward(self, content, style, alpha=1.0,
+    def test(self,content,batch_style,alpha=1.0,
+             interpolation_weights=(1,1,1,1)):
+        assert (0.0<=alpha<=1.0)
+        style = torch.stack(list(batch_style))
+        content = content.expand_as(style)
+        style = style.cuda()
+        content = content.cuda()
+
+        content_f = self.encode(content)
+        style_f = self.encode(style)
+
+        _, C, H, W = content_f.size()
+        feat = torch.FloatTensor(1, C, H, W).zero_().cuda()
+        base_feat = adaptive_instance_normalization(content_f,style_f)
+        for i,w in enumerate(interpolation_weights):
+            feat = feat + w*base_feat[i:i+1]
+        content_f = content_f[0:1]
+
+        feat = feat*alpha+content_f*(1-alpha)
+
+        return self.decoder(feat)
+
+    def forward(self, content, batch_style, alpha=1.0,
                 interpolation_weights=(1,1,1,1)):
         assert 0 <= alpha <= 1
+        i = random.randint(0, 3)
+        style = batch_style[i].cuda()
+        content = content.cuda()
+
         style_feats = self.encode_with_intermediate(style)
+        # style_feats[0].size() [4, 64, 1024, 512]
         content_feat = self.encode(content)
+        t = adaptive_instance_normalization(
+                        content_feat, style_feats[-1])
+        t = alpha * t + (1 - alpha) * content_feat
 
-        style_f = vgg(style)
-
-        if interpolation_weights:
-            _, C, H, W = content_feat.size()
-            feat = torch.FloatTensor(1, C, H, W).zero_().cuda()
-            base_feat = adaptive_instance_normalization(content_feat, style_f)
-            for i, w in enumerate(interpolation_weights):  # 四个style根据比例合并
-                feat = feat + w * base_feat[i:i + 1]
-            content_feat = content_feat[0:1]  # 内容特征每一层都是一样的，因此取一层即可
-
-        feat = alpha * feat + (1 - alpha) * content_feat
-
-        g_t = self.decoder(feat)
+        g_t = self.decoder(t)
         g_t_feats = self.encode_with_intermediate(g_t)
+        # print("style_feats[0].size is",style_feats[0].size(),end='')
+        # print('whereas g_t_feats[0].size is',g_t_feats[0].size())
 
-        loss_c = self.calc_content_loss(g_t_feats[-1], feat)
+
+        loss_c = self.calc_content_loss(g_t_feats[-1], t)
         loss_s = self.calc_style_loss(g_t_feats[0], style_feats[0])
         for i in range(1, 4):
             loss_s += self.calc_style_loss(g_t_feats[i], style_feats[i])
-        return loss_c, loss_s, g_t
+        return loss_c, loss_s

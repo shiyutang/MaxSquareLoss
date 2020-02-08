@@ -33,15 +33,15 @@ class UDATrainer(Trainer):
         super().__init__(args, cuda, train_id, logger)  # 调用父类的初始化，这样不用重写函数，同时初始化了应有的参数
 
         ## source train loader
-        source_dataset = GTA5_Dataset(args,
+        self.source_dataset = GTA5_Dataset(args,
                                data_root_path=self.datasets_path["gta5"]['data_root_path'],
                                list_path=self.datasets_path['gta5']['list_path'],
                                gt_path=self.datasets_path['gta5']['gt_path'],
-                               split='train',
+                               split='train_style',
                                base_size=(1024,512),
                                crop_size=(1024,512))
         self.source_dataloader = \
-            data.DataLoader(source_dataset,
+            data.DataLoader(self.source_dataset,
                            batch_size=self.args.batch_size,
                            shuffle=True,
                            num_workers=self.args.data_loader_workers,
@@ -49,15 +49,15 @@ class UDATrainer(Trainer):
                            drop_last=True)
 
         ## source validation loader
-        source_dataset = GTA5_Dataset(args,
+        self.source_dataset = GTA5_Dataset(args,
                                        data_root_path=self.datasets_path['gta5']['data_root_path'],
                                        list_path=self.datasets_path['gta5']['list_path'],
                                        gt_path=self.datasets_path['gta5']['gt_path'],
-                                       split='val',
+                                       split='val_style',
                                        base_size=(1024,512),
                                        crop_size=(1024,512))
         self.source_val_dataloader = data.DataLoader\
-                                    (source_dataset,
+                                    (self.source_dataset,
                                      batch_size=self.args.batch_size,
                                      shuffle=False,
                                      num_workers=self.args.data_loader_workers,
@@ -65,32 +65,32 @@ class UDATrainer(Trainer):
                                      drop_last=True)
 
         ## target dataset train and validation
-        target_data_set =\
+        self.target_data_set =\
             City_Dataset(args,
                        data_root_path=self.datasets_path['cityscapes']['data_root_path'],
                        list_path=self.datasets_path['cityscapes']['list_path'],
                        gt_path=self.datasets_path['cityscapes']['gt_path'],
-                       split='train',
+                       split='train_style',
                        base_size=(1024,512),
                        crop_size=(1024,512),
                        class_16=args.class_16)
         self.target_dataloader = data.DataLoader\
-                                       (target_data_set,
+                                       (self.target_data_set,
                                        batch_size=self.args.batch_size,
                                        shuffle=True,
                                        num_workers=self.args.data_loader_workers,
                                        pin_memory=self.args.pin_memory,
                                        drop_last=True)
-        target_data_set =             \
+        self.target_data_set =             \
             City_Dataset(args,
                        data_root_path=self.datasets_path['cityscapes']['data_root_path'],
                        list_path=self.datasets_path['cityscapes']['list_path'],
                        gt_path=self.datasets_path['cityscapes']['gt_path'],
-                       split='val',
+                       split='val_style',
                        base_size=(1024,512),
                        crop_size=(1024,512),
                        class_16=args.class_16)
-        self.target_val_dataloader = data.DataLoader(target_data_set,
+        self.target_val_dataloader = data.DataLoader(self.target_data_set,
                                                      batch_size=self.args.batch_size,
                                                      shuffle=False,
                                                      num_workers=self.args.data_loader_workers,
@@ -99,7 +99,7 @@ class UDATrainer(Trainer):
 
         style_dataset = FlatFolderDataset(
             root="/data/Projects/MaxSquareLoss/imagenet_style/ambulance",
-            transforms=ADAIN_transform)
+            transform=ADAIN_transform())
 
         self.style_dataloader=iter(data.DataLoader(style_dataset,
                                               batch_size=4,
@@ -110,17 +110,10 @@ class UDATrainer(Trainer):
 
         self.dataloader.val_loader = self.target_val_dataloader
 
-        self.dataloader.valid_iterations = (len(target_data_set) + self.args.batch_size) // self.args.batch_size
+        self.dataloader.valid_iterations = (len(self.target_data_set) + self.args.batch_size) // self.args.batch_size
 
-        ## add ADAIN models
-        ADAIN_encoder = vgg
-        ADAIN_decoder = decoder
-        ADAIN_encoder.load_state_dict(torch.load("/data/Projects/pytorch-AdaIN/models/vgg_normalized.pth"))
-        ADAIN_encoder = nn.Sequential(*list(ADAIN_encoder.children())[:31])
-        ADAIN_decoder.load_state_dict(torch.load('/data/Projects/pytorch-AdaIN/models/decoder.pth'))
-
-        self.network = Net(ADAIN_encoder,ADAIN_decoder)
-        if torch.cuda.device_count()>1:
+        self.network = Net()
+        if torch.cuda.device_count()>=1:
             self.network = nn.DataParallel(self.network)
         self.network.train()
         self.network.cuda()
@@ -148,19 +141,17 @@ class UDATrainer(Trainer):
         self.target_hard_loss = nn.CrossEntropyLoss(ignore_index=-1)
 
         ## initially add network parameters into
-        self.params.append({'params':self.network.parameters(),'lr':self.args.lr})
-        for group in self.params:
-            group['params'] = filter(lambda p:p.requires_grad, group['params'])
+        allparams = self.params+[{'params':self.network.parameters(),'lr':self.args.lr}]
 
-        if self.args.optim == "Adam":
-            self.all_optimizer = torch.optim.Adam(self.params,
-                             betas=(0.9, 0.99),
-                             weight_decay=self.args.weight_decay)
-            self.adain_optimizer = torch.optim.Adam(
-                filter(lambda p: p.requires_grad, self.network.parameters()),
-                betas=(0.9, 0.99),
-                weight_decay=self.args.weight_decay
-            )
+        self.all_optimizer = torch.optim.Adam(
+             allparams,
+             betas=(0.9, 0.99),
+             weight_decay=self.args.weight_decay)
+        self.adain_optimizer = torch.optim.Adam(
+            self.network.parameters(),
+            lr=self.args.lr,
+            betas=(0.9, 0.99),
+            weight_decay=self.args.weight_decay)
 
     def save_shuffled_list(self):
         with open(os.path.join(self.datasets_path['gta5']['list_path'],
@@ -172,6 +163,18 @@ class UDATrainer(Trainer):
                                "train.txt"), "w+") as f:
             for line in content:
                 f.write(line)
+
+    def save_tensor_as_Image(self,tensor,path,name):
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+        image = tensor.cpu().clone()  # we clone the tensor to not do changes on it
+        image = image.squeeze(0)  # remove the fake batch dimension
+        image = transforms.ToPILImage()(image)
+        image.save(os.path.join(path,
+                                name+'_epoch{}_stywt{}-loss_c{:.1}-loss_stl{:.1}.png'
+                                .format(self.current_epoch,self.style_loss_weight,
+                                        self.loss_c,self.loss_s)))
 
     def train_target(self, pred):
         if isinstance(pred, tuple):
@@ -306,7 +309,10 @@ class UDATrainer(Trainer):
 
         batch_idx = 0  # iter in the data
         batch_style = next(self.style_dataloader).cuda()
+        self.batch_style = batch_style
+        self.style_loss_weight = 5
 
+        # print('self.args.numpy_transform is ', self.args.numpy_transform) True
         for batch_s, batch_t in tqdm_epoch:
             self.poly_lr_scheduler(optimizer=self.optimizer, init_lr=self.args.lr)
             self.poly_lr_scheduler(optimizer = self.all_optimizer, init_lr = self.args.lr)
@@ -316,38 +322,52 @@ class UDATrainer(Trainer):
             # get source and target picture from ADAIN #
             ############################################
             ## source ##
-            content_image,_,__ = batch_s
+            content,_,__ = batch_s
+            self.loss_c,self.loss_s = self.network(content,batch_style)
 
-            style = torch.stack(list(batch_style))
-            content = content_image.unsqueeze(0).expand_as(style)
-            style = style.cuda()
-            content = content.cuda()
-            loss_c,loss_s,trans_source = self.network(content,style)
+            ADAIN_loss = self.loss_c+self.style_loss_weight*self.loss_s
 
-            ADAIN_loss = loss_c+10*loss_s
-            self.adain_optimizer.zero_grad()
+            self.writer.add_scalar('content_loss_source', self.loss_c, self.current_epoch)
+            self.writer.add_scalar('style_loss_source', self.loss_s, self.current_epoch)
+            # self.logger.info('finish ADAIN source')
 
             ## target
-            content_image, _, __ = batch_t
+            content, _, __ = batch_t
 
-            style = torch.stack(list(batch_style))
-            content = content_image.unsqueeze(0).expand_as(style)
-            style = style.cuda()
-            content = content.cuda()
-            loss_c, loss_s, trans_target = self.network(content, style)
+            self.loss_c, self.loss_s= self.network(content, batch_style)
 
-            ADAIN_loss += loss_c + 10 * loss_s
+            self.writer.add_scalar('content_loss_target', self.loss_c, self.current_epoch)
+            self.writer.add_scalar('style_loss_target', self.loss_s, self.current_epoch)
+
+            ADAIN_loss += self.loss_c + self.style_loss_weight * self.loss_s
             self.adain_optimizer.zero_grad()
             ADAIN_loss.backward()
             self.adain_optimizer.step()
 
+            self.writer.add_scalar('total_loss_srctgt',ADAIN_loss,self.current_epoch)
+            # self.logger.info('finish ADAIN target')
 
             ##########################
             # source supervised loss #
             ##########################
             # train with source
-            __, y, _ = batch_s
+            x, y, _ = batch_s
+            trans_source = self.network.test(x,batch_style)
+
+            if batch_idx%10==0:
+                self.save_tensor_as_Image(tensor=x,
+                                          path=os.path.join(self.args.save_dir,
+                                                          "picResult"),
+                                          name="source")
+                self.save_tensor_as_Image(tensor=trans_source,
+                                          path=os.path.join(self.args.save_dir,
+                                                            "picResult"),
+                                          name="source_trans")
+
+            # print('trans_source size is ',trans_source.size())
             x = trans_source
+            x = self.source_dataset._train_sync_transform(
+                        transforms.ToPILImage()(x.squeeze(0).cpu()),None).unsqueeze(0)
             if self.cuda:
                 x, y = Variable(x).to(self.device), \
                        Variable(y).to(device=self.device, dtype=torch.long)
@@ -358,7 +378,23 @@ class UDATrainer(Trainer):
             #####################
             # train with target #
             #####################
-            x=trans_target
+            x, _, _ = batch_t
+            trans_target = self.network.test(x,batch_style)
+
+            if batch_idx%10==0:
+                self.save_tensor_as_Image(tensor=x,
+                                          path=os.path.join(self.args.save_dir,
+                                                          "picResult"),
+                                          name="target")
+                self.save_tensor_as_Image(tensor=trans_target,
+                                          path=os.path.join(self.args.save_dir,
+                                                            "picResult"),
+                                          name="target_trans")
+
+            # print('trans_target size is ',trans_target.size())
+            x = trans_target
+            x = self.target_data_set._train_sync_transform(
+                        transforms.ToPILImage()(x.squeeze(0).cpu()),None).unsqueeze(0)
             if self.cuda:
                 x = Variable(x).to(self.device)
             pred = self.model(x)
@@ -378,11 +414,11 @@ class UDATrainer(Trainer):
         tqdm.write("The average target_loss of train epoch-{}-:{:.3f}".format(self.current_epoch, self.loss_target_value))
         if self.args.multi:
             self.writer.add_scalar('train_loss_2', self.loss_seg_value_2, self.current_epoch)
-            self.writer.add_scalar('train_loss_2', self.loss_seg_value_2, self.current_epoch)
-            tqdm.write("The average loss_2 of train epoch-{}-:{}".format(self.current_epoch, self.loss_seg_value_2))
+            tqdm.write("The average loss_2 of train epoch-{}-:{}"
+                       .format(self.current_epoch, self.loss_seg_value_2))
             self.writer.add_scalar('target_loss_2', self.loss_target_value_2, self.current_epoch)
-            tqdm.write(
-                "The average target_loss_2 of train epoch-{}-:{:.3f}".format(self.current_epoch, self.loss_target_value_2))
+            tqdm.write("The average target_loss_2 of train epoch-{}-:{:.3f}"
+                       .format(self.current_epoch, self.loss_target_value_2))
         tqdm_epoch.close()
 
         # eval on source domain

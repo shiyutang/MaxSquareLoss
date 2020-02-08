@@ -11,7 +11,8 @@ from math import ceil
 import numpy as np
 from distutils.version import LooseVersion
 from tensorboardX import SummaryWriter
-from torchvision.utils import make_grid
+from torchvision import  transforms
+from torchvision import  transforms
 
 import sys
 sys.path.append(os.path.abspath('.'))
@@ -333,6 +334,11 @@ class Trainer():
             i = 0
 
             for x, y, id in tqdm_batch:
+                x = self.network.test(x,self.batch_style)
+
+                x = self.source_dataset._train_sync_transform(
+                            transforms.ToPILImage()(x.squeeze(0).cpu()), None).unsqueeze(0)
+
                 if self.cuda:
                     x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
 
@@ -409,11 +415,15 @@ class Trainer():
         self.logger.info('\nvalidating source domain...')
         self.Eval.reset()
         with torch.no_grad():
-            tqdm_batch = tqdm(self.source_trans_val_dataloader, total=self.dataloader.valid_iterations,
+            tqdm_batch = tqdm(self.source_val_dataloader, total=self.dataloader.valid_iterations,
                               desc="Source Val Epoch-{}-".format(self.current_epoch + 1))
             self.model.eval()
             i = 0
             for x, y, id in tqdm_batch:
+                x = self.network(x,self.batch_style)
+
+                x = self.source_dataset._train_sync_transform(
+                            transforms.ToPILImage()(x.squeeze(0).cpu()), None).unsqueeze(0)
                 # y.to(torch.long)
                 if self.cuda:
                     x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
@@ -618,7 +628,7 @@ def add_train_args(arg_parser):
                         help='add random_crop')
     arg_parser.add_argument('--resize', default=True, type=str2bool,
                         help='resize')
-    arg_parser.add_argument('--gaussian_blur', default=True, type=str2bool,
+    arg_parser.add_argument('--gaussian_blur', default=False, type=str2bool,
                         help='add gaussian_blur')
     arg_parser.add_argument('--numpy_transform', default=True, type=str2bool,
                         help='image transform with numpy style')
@@ -638,7 +648,7 @@ def add_train_args(arg_parser):
                             help="the maxinum of iteration")
     arg_parser.add_argument('--iter_stop', type=int, default=80000,
                             help="the early stop step")
-    arg_parser.add_argument('--poly_power', type=float, default=0.9,
+    arg_parser.add_argument('--poly_power', type=float, default=0.95,
                             help="poly_power")
 
     # multi-level output
