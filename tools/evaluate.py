@@ -104,10 +104,8 @@ class Evaluater():
         with torch.no_grad():
             tqdm_batch = tqdm(self.dataloader.val_loader, total=self.dataloader.valid_iterations,
                               desc="Val Epoch-{}-".format(self.current_epoch + 1))
-            val_loss = []
             self.model.eval()
             i = 0
-            count = 0
 
             for x, y, id in tqdm_batch:
                 i += 1

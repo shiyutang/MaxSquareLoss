@@ -89,7 +89,7 @@ class GTA5_Dataset(City_Dataset):
         self.class_16 = False
         self.class_13 = False
 
-        print("{} num images in GTA5 {} set have been loaded.".format(len(self.items), self.split))
+        # print("{} num images in GTA5 {} set have been loaded.".format(len(self.items), self.split))
 
     def __getitem__(self, item):
         id = int(self.items[item][-9:-4])
@@ -100,13 +100,17 @@ class GTA5_Dataset(City_Dataset):
         gt_image_path = os.path.join(self.gt_filepath, "{:0>5d}.png".format(id))
         gt_image = Image.open(gt_image_path)
 
-        if ("train" in self.split) and self.training:
-            image_tf, gt_image = self._train_sync_transform(image, gt_image)
-        else:
-            image_tf, gt_image = self._val_sync_transform(image, gt_image)
-
         if 'style' in self.split:
             image_tf = train_transform()(image)
+            if ("train" in self.split or "trainval" in self.split) and self.training:
+                _, gt_image = self._train_sync_transform(image, gt_image)
+            else:
+                _, gt_image = self._val_sync_transform(image, gt_image)
+        else:
+            if ("train" in self.split or "trainval" in self.split) and self.training:
+                image_tf, gt_image = self._train_sync_transform(image, gt_image)
+            else:
+                image_tf, gt_image = self._val_sync_transform(image, gt_image)
 
 
         return image_tf, gt_image, item

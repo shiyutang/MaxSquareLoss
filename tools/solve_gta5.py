@@ -367,7 +367,7 @@ class UDATrainer(Trainer):
                                                                                            dtype=torch.long)
 
                     pred = self.model(x_aux)
-                    self.train_source(pred, y_aux) # 暂时使得标签相同 todo 后续加上特征层次ASPP对齐
+                    self.train_source(pred, y_aux) # 暂时使得标签相同
 
             #####################
             # train with target #
@@ -387,7 +387,7 @@ class UDATrainer(Trainer):
                     if self.cuda:
                         x_aux = Variable(x_aux).to(self.device)
                     pred = self.model(x_aux)
-                    self.train_target(pred) # 暂时使得标签相同 todo 后续加上特征层次ASPP对齐
+                    self.train_target(pred) # 暂时使得标签相同
 
             self.optimizer.step()
             self.optimizer.zero_grad()

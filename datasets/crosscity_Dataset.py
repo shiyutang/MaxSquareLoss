@@ -63,7 +63,7 @@ class CrossCity_Dataset(City_Dataset):
         synthia_set_13 = [0, 1, 2, 6, 7, 8, 10, 11, 12, 13, 15, 17, 18]
         self.trainid_to_13id = {id:i for i,id in enumerate(synthia_set_13)}
 
-        print("{} num images in City {} set have been loaded.".format(len(self.items), self.split))
+        # print("{} num images in City {} set have been loaded.".format(len(self.items), self.split))
 
     def __getitem__(self, item):
         id = self.items[item]

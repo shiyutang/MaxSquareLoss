@@ -1,6 +1,8 @@
 import torch.nn as nn
 import torch
 import random
+import copy
+import pickle
 
 from graphs.models.deeplab_multi import DeeplabMulti
 
@@ -133,8 +135,10 @@ class Net(nn.Module):
         self.enc_2 = nn.Sequential(*enc_layers[4:11])  # relu1_1 -> relu2_1
         self.enc_3 = nn.Sequential(*enc_layers[11:18])  # relu2_1 -> relu3_1
         self.enc_4 = nn.Sequential(*enc_layers[18:31])  # relu3_1 -> relu4_1
+        self.encoder = nn.Sequential(*list(vgg.children())[:31])
         decoder.load_state_dict(
-                torch.load("/data/Projects/pytorch-AdaIN/models/decoder_iter_160000.pth.tar"))
+                torch.load('/data/Projects/pytorch-AdaIN/experiments/decoder_iter_160000.pth.tar'))
+                # torch.load("/data/Projects/pytorch-AdaIN/models/decoder.pth"))
         self.decoder = decoder
         self.mse_loss = nn.MSELoss()
 
@@ -170,11 +174,14 @@ class Net(nn.Module):
         return self.mse_loss(input_mean, target_mean) + \
                self.mse_loss(input_std, target_std)
 
-    def test(self,content,batch_style,alpha=1.0,
-             interpolation_weights=(1,1,1,1)):
-        assert (0.0<=alpha<=1.0)
+    def test(self,content,batch_style,save_path,alpha=1.0,
+             weights=(1,1,1,1)):
+        assert (0.0<=alpha<=1.0) #todo super parameter
+        # print('start producing test images')
+        interpolation_weights = [i / sum(weights) for i in weights]
         style = torch.stack(list(batch_style))
-        content = content.expand_as(style)
+        content = content.expand_as(style)  ## problem alert: value in the wrong way
+
         style = style.cuda()
         content = content.cuda()
 
@@ -186,34 +193,154 @@ class Net(nn.Module):
         base_feat = adaptive_instance_normalization(content_f,style_f)
         for i,w in enumerate(interpolation_weights):
             feat = feat + w*base_feat[i:i+1]
-        content_f = content_f[0:1]
 
-        feat = feat*alpha+content_f*(1-alpha)
+        feat = feat*alpha+content_f[0:1]*(1-alpha)
+        gt = self.decoder(feat)
 
-        return self.decoder(feat)
+        return gt
 
     def forward(self, content, batch_style, alpha=1.0,
-                interpolation_weights=(1,1,1,1)):
+                        weights=(1,1,1,1),save_path = None):
         assert 0 <= alpha <= 1
-        i = random.randint(0, 3)
-        style = batch_style[i].cuda()
+        style = batch_style.cuda()
+        # print('batch_style.size inside', style.size())
+        content = content.expand_as(style)
+        content = content.cuda()
+
+        interpolation_weights = [i / sum(weights) for i in weights]
+
+        content_f = self.encoder(content)
+        style_f = self.encoder(style)
+
+        _, C, H, W = content_f.size()
+        feat = torch.FloatTensor(1, C, H, W).zero_().cuda()
+        base_feat = adaptive_instance_normalization(content_f,style_f)
+        for i, w in enumerate(interpolation_weights):
+            feat = feat + w * base_feat[i:i + 1]
+
+        t = alpha * feat+ (1 - alpha) * content_f[0:1]
+
+        g_t = self.decoder(t)
+        # with open('/data/Projects/MaxSquareLoss/output/adain_out/adain_g_t.pickle', 'wb') as handle:
+        #     pickle.dump(g_t.cpu(), handle, protocol=pickle.HIGHEST_PROTOCOL)
+        # style_gt = decoder(style_f)
+        # style_g_t = pickle.load(open("/data/Projects/MaxSquareLoss/output/style_out/style_g_t.pickle", "rb" ))
+        # g_tcpu = g_t.cpu()
+        # a = abs(g_tcpu-style_g_t)
+        # b = a<=0.01
+
+        # with open(save_path, "w+") as f:
+        #     f.write('b is {},\n gt is {} \n  \
+        #              a is {},\n style_g_t is {}'
+        #             .format(b,g_tcpu, content_f, g_t, a, style_g_t))
+        #     # f.write('style_g_t[0,0,0,0] {},g_t[0,0,0,0] {},{}'.format(
+        #     #     style_g_t[0,0,0,0],g_t[0,0,0,0],style_g_t[0,2,6,7]==g_t[0,2,6,7]))
+
+        return  g_t
+
+    def train_single(self, content, style, alpha=1.0,
+                weights=(1,1,1,1)):
+        assert 0 <= alpha <= 1
+        style = style.cuda()
         content = content.cuda()
 
         style_feats = self.encode_with_intermediate(style)
-        # style_feats[0].size() [4, 64, 1024, 512]
         content_feat = self.encode(content)
-        t = adaptive_instance_normalization(
-                        content_feat, style_feats[-1])
-        t = alpha * t + (1 - alpha) * content_feat
+
+        feat = adaptive_instance_normalization(content_feat,
+                                            style_feats[-1])
+        t = alpha * feat+ (1 - alpha) * content_feat
 
         g_t = self.decoder(t)
         g_t_feats = self.encode_with_intermediate(g_t)
-        # print("style_feats[0].size is",style_feats[0].size(),end='')
-        # print('whereas g_t_feats[0].size is',g_t_feats[0].size())
-
 
         loss_c = self.calc_content_loss(g_t_feats[-1], t)
         loss_s = self.calc_style_loss(g_t_feats[0], style_feats[0])
         for i in range(1, 4):
             loss_s += self.calc_style_loss(g_t_feats[i], style_feats[i])
-        return loss_c, loss_s
+        return loss_c, loss_s, g_t
+
+
+def make_grid(tensor, nrow=8, padding=2,
+              normalize=False, range=None, scale_each=False, pad_value=0):
+    """Make a grid of images.
+
+    Args:
+        tensor (Tensor or list): 4D mini-batch Tensor of shape (B x C x H x W)
+            or a list of images all of the same size.
+        nrow (int, optional): Number of images displayed in each row of the grid.
+            The final grid size is ``(B / nrow, nrow)``. Default: ``8``.
+        padding (int, optional): amount of padding. Default: ``2``.
+        normalize (bool, optional): If True, shift the image to the range (0, 1),
+            by the min and max values specified by :attr:`range`. Default: ``False``.
+        range (tuple, optional): tuple (min, max) where min and max are numbers,
+            then these numbers are used to normalize the image. By default, min and max
+            are computed from the tensor.
+        scale_each (bool, optional): If ``True``, scale each image in the batch of
+            images separately rather than the (min, max) over all images. Default: ``False``.
+        pad_value (float, optional): Value for the padded pixels. Default: ``0``.
+
+    Example:
+        See this notebook `here <https://gist.github.com/anonymous/bf16430f7750c023141c562f3e9f2a91>`_
+
+    """
+    if not (torch.is_tensor(tensor) or
+            (isinstance(tensor, list) and all(torch.is_tensor(t) for t in tensor))):
+        raise TypeError('tensor or list of tensors expected, got {}'.format(type(tensor)))
+
+    # if list of tensors, convert to a 4D mini-batch Tensor
+    if isinstance(tensor, list):
+        tensor = torch.stack(tensor, dim=0)
+
+    if tensor.dim() == 2:  # single image H x W
+        tensor = tensor.unsqueeze(0)
+    if tensor.dim() == 3:  # single image
+        if tensor.size(0) == 1:  # if single-channel, convert to 3-channel
+            tensor = torch.cat((tensor, tensor, tensor), 0)
+        tensor = tensor.unsqueeze(0)
+
+    if tensor.dim() == 4 and tensor.size(1) == 1:  # single-channel images
+        tensor = torch.cat((tensor, tensor, tensor), 1)
+
+    if normalize is True:
+        tensor = tensor.clone()  # avoid modifying tensor in-place
+        if range is not None:
+            assert isinstance(range, tuple), \
+                "range has to be a tuple (min, max) if specified. min and max are numbers"
+
+        def norm_ip(img, min, max):
+            img.clamp_(min=min, max=max)
+            img.add_(-min).div_(max - min + 1e-5)
+
+        def norm_range(t, range):
+            if range is not None:
+                norm_ip(t, range[0], range[1])
+            else:
+                norm_ip(t, float(t.min()), float(t.max()))
+
+        if scale_each is True:
+            for t in tensor:  # loop over mini-batch dimension
+                norm_range(t, range)
+        else:
+            norm_range(tensor, range)
+
+    if tensor.size(0) == 1:
+        return tensor.squeeze(0)
+
+    # make the mini-batch of images into a grid
+    import math
+    nmaps = tensor.size(0)
+    xmaps = min(nrow, nmaps)
+    ymaps = int(math.ceil(float(nmaps) / xmaps))
+    height, width = int(tensor.size(2) + padding), int(tensor.size(3) + padding)
+    grid = tensor.new_full((3, height * ymaps + padding, width * xmaps + padding), pad_value)
+    k = 0
+    for y in range(ymaps):
+        for x in range(xmaps):
+            if k >= nmaps:
+                break
+            grid.narrow(1, y * height + padding, height - padding)\
+                .narrow(2, x * width + padding, width - padding)\
+                .copy_(tensor[k])
+            k = k + 1
+    return grid

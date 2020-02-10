@@ -7,6 +7,8 @@
           <mappings>
             <mapping deploy="/data/Projects/MaxSquareLoss" local="$PROJECT_DIR$" web="/" />
             <mapping deploy="/data/Projects/ADVENT" local="$PROJECT_DIR$/../ADVENT-master" web="/" />
+            <mapping deploy="/data/Projects/pytorch-AdaIN" local="$PROJECT_DIR$/../pytorch-AdaIN" />
+            <mapping local="" />
           </mappings>
         </serverdata>
       </paths>

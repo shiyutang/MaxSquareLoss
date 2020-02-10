@@ -15,6 +15,7 @@ from torchvision import  transforms
 from torchvision import  transforms
 
 import sys
+import random
 sys.path.append(os.path.abspath('.'))
 from utils.eval import Eval
 from utils.train_helper import get_model
@@ -49,7 +50,8 @@ datasets_path={
                    'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
                    'image_path': '/data/Projects/ADVENT/data/Cityscapes_prunus_mume/leftImg8bit',
                    'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
-    'gta5': {'data_root_path': '/data/Projects/ADVENT/data/GTA5', 'list_path': '/data/Projects/ADVENT/data/GTA5',
+    'gta5': {'data_root_path': '/data/Projects/ADVENT/data/GTA5',
+             'list_path': '/data/Projects/ADVENT/data/GTA5',
                     'image_path':'/data/Projects/ADVENT/data/GTA5/images',
                     'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
     'GTA5_accordion': {'data_root_path': '/data/Projects/ADVENT/data/GTA5_accordion', 'list_path': '/data/Projects/ADVENT/data/GTA5',
@@ -128,7 +130,7 @@ class Trainer():
 
         # optimizer
         if self.args.optim == "SGD":
-            self.optimizer = torch.optim.SGD(
+            self.optimizer = torch.optim.SGD(lr=self.args.lr,
                 params=self.params,
                 momentum=self.args.momentum,
                 weight_decay=self.args.weight_decay
@@ -148,8 +150,8 @@ class Trainer():
         self.epoch_num = ceil(self.args.iter_max / self.dataloader.num_iterations) if self.args.iter_stop is None else \
                             ceil(self.args.iter_stop / self.dataloader.num_iterations)
 
-        self.logger.info('I am loading training data and validation data from {}'.\
-                         format(datasets_path[self.args.dataset]['data_root_path']))
+        # self.logger.info('I am loading training data and validation data from {}'.\
+        #                  format(datasets_path[self.args.dataset]['data_root_path']))
 
     def main(self):
         # display args details
@@ -322,6 +324,18 @@ class Trainer():
         self.writer.add_scalar('train_loss', tr_loss, self.current_epoch)
         tqdm.write("The average loss of train epoch-{}-:{}".format(self.current_epoch, tr_loss))
 
+    def result_tran(self,tensor,nrow=8, padding=2,
+               normalize=False, range=None, scale_each=False, pad_value=0):
+        from PIL import Image
+        from utils.train_helper import make_grid
+        image = tensor.cpu().clone()
+        grid = make_grid(image, nrow=nrow, padding=padding, pad_value=pad_value,
+                         normalize=normalize, range=range, scale_each=scale_each)
+        # Add 0.5 after unnormalizing to [0, 255] to round to nearest integer
+        ndarr = grid.mul_(255).add_(0.5).clamp_(0, 255).permute(1, 2, 0).to('cpu', torch.uint8).numpy()
+        im = Image.fromarray(ndarr)
+        return im
+
     def validate(self, mode='val'):
         self.logger.info('\nvalidating one epoch...')
         self.Eval.reset()
@@ -330,14 +344,13 @@ class Trainer():
                               desc="Val Epoch-{}-".format(self.current_epoch + 1))
             if mode == 'val':
                 self.model.eval()
-            
-            i = 0
 
             for x, y, id in tqdm_batch:
-                x = self.network.test(x,self.batch_style)
+                x = self.network(x,self.batch_style)
 
-                x = self.source_dataset._train_sync_transform(
-                            transforms.ToPILImage()(x.squeeze(0).cpu()), None).unsqueeze(0)
+
+                x, _ = self.target_data_set._val_sync_transform(self.result_tran(x), None)
+                x = x.unsqueeze(0)
 
                 if self.cuda:
                     x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
@@ -422,12 +435,11 @@ class Trainer():
             for x, y, id in tqdm_batch:
                 x = self.network(x,self.batch_style)
 
-                x = self.source_dataset._train_sync_transform(
-                            transforms.ToPILImage()(x.squeeze(0).cpu()), None).unsqueeze(0)
+                x, _ = self.source_dataset._val_sync_transform(self.result_tran(x), None)
+                x = x.unsqueeze(0)
                 # y.to(torch.long)
                 if self.cuda:
                     x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
-
                 # model
                 pred = self.model(x)
 
@@ -436,14 +448,13 @@ class Trainer():
                     pred = pred[0]
                     pred_P = F.softmax(pred, dim=1)
                     pred_P_2 = F.softmax(pred_2, dim=1)
-                y = torch.squeeze(y, 1)
 
+                y = torch.squeeze(y, 1)
                 pred = pred.data.cpu().numpy()
                 label = y.cpu().numpy()
                 argpred = np.argmax(pred, axis=1)
 
                 self.Eval.add_batch(label, argpred)
-
                 i += 1
                 if i == self.dataloader.valid_iterations:
                     break

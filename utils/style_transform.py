@@ -9,6 +9,7 @@ import torch.nn as nn
 from torchvision import transforms
 from torchvision.utils import save_image
 from tqdm import tqdm
+import pickle
 
 style_dirs = [f for f in Path("/data/Projects/MaxSquareLoss/imagenet_style").glob("*")]
 
@@ -235,7 +236,7 @@ def coral(source, target):
 def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_dir=None,
                    vgg_pretrain = "/data/Projects/pytorch-AdaIN/models/vgg_normalised.pth",vgg = vgg,
                    decoder_pretrain="/data/Projects/pytorch-AdaIN/models/decoder.pth",decoder=decoder,
-                   content_size=(1052, 1914),style_size=(1052,1914),crop=None,save_ext=".jpg",
+                   content_size=(512, 1024),style_size=(512,1024),crop=None,save_ext=".jpg",
                    output_path="", preserve_color=None, alpha=1.0,
                    style_interpolation_weight=None,exp_tag = "", do_interpolation=False):
 
@@ -251,7 +252,7 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
         return transform
 
 
-    def style_transfer(vgg, decoder, content, style, alpha=1.0,
+    def style_transfer(vgg, decoder, content, style, save_path,alpha=1.0,
                        device=None, interpolation_weights=None):
         assert (0.0 <= alpha <= 1.0)
         content_f = vgg(content)
@@ -262,11 +263,44 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
             base_feat = adaptive_instance_normalization(content_f, style_f)
             for i, w in enumerate(interpolation_weights):  # 四个style根据比例合并
                 feat = feat + w * base_feat[i:i + 1]
-            content_f = content_f[0:1]  # 内容特征每一层都是一样的，因此取一层即可
+            # content_f = content_f[0:1]  # 内容特征每一层都是一样的，因此取一层即可
         else:
             feat = adaptive_instance_normalization(content_f, style_f)
-        feat = feat * alpha + content_f * (1 - alpha)
-        return decoder(feat)
+        feat = feat * alpha + content_f[0:1] * (1 - alpha)
+        g_t = decoder(feat)
+        style_gt = decoder(style_f)
+        with open('/data/Projects/MaxSquareLoss/output/style_out/style_g_t.pickle', 'wb') as handle:
+            pickle.dump(g_t.cpu(), handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+        with open(save_path, "w+") as f:
+            f.write('style.size{}, content.size {} \n \
+                    style.max {}, style.min {}     \n     \
+                    style is {}                     \n  \
+                    style_gt is {}                  \n    \
+                    content.max{},content.min{}       \n  \
+                    content_f.size{},style_f.size{},   \n \
+                    content_f.max{}, content_f.min{},  \n \
+                    style_f.max{}, style_f.min{},    \n   \
+                    base_feat.size{},feat.size{},     \n  \
+                    base_feat.max{},base_feat.min{},  \n  \
+                    feat.max{},feat.min{},             \n \
+                    g_t.size{},g_t.max{},g_t.min{}        \n  \
+                    content_f[0:1] is {}, g_t[0:1] is {}'
+                    .format(style.size(), content.size(),
+                            style.max(), style.min(),
+                            style[0:1],style_gt[0:1],
+                            content.max(),content.min(),
+                            content_f.size(),style_f.size(),
+                            content_f.max(), content_f.min(),
+                            style_f.max(), style_f.min(),
+                            base_feat.size(),feat.size(),
+                            base_feat.max(),base_feat.min(),
+                            feat.max(),feat.min(),
+                            g_t.size(),g_t.max(),g_t.min(),
+                            content_f[0:1], g_t[0:1]))
+
+        return g_t
 
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
@@ -323,14 +357,21 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
         if out_name.exists():
             continue
         if do_interpolation:
-            style = torch.stack([style_tf(Image.open(file)) for file in style_paths])
-            content = content_tf(Image.open(content_path)).unsqueeze(0).expand_as(style)
+            style = torch.stack([style_tf(Image.open(file))
+                                    for file in style_paths])
+
+            content = content_tf(Image.open(content_path)).\
+                                    unsqueeze(0).expand_as(style)
             style = style.to(device)
             content = content.to(device)
 
             with torch.no_grad():
-                output_Tensor = style_transfer(vgg,decoder,content,style,alpha,device,
-                                            interpolation_weight)
+                output_Tensor = style_transfer(
+                       vgg,decoder,content,style,
+                       save_path='/data/Projects/MaxSquareLoss/output/style_out/cmp.txt',
+                       alpha = alpha,
+                       device=device,
+                       interpolation_weights = interpolation_weight)
 
             output_Tensor.cpu()
             out_name = Path.joinpath(output_dir,str(content_path.stem)+".{}".format(save_ext))
@@ -357,8 +398,8 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
 
 
 if __name__ == '__main__':
-    content_dirs = [f for f in Path("/data/Projects/ADVENT/data/Cityscapes/leftImg8bit/val").glob("*")]
-    # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][0:9988]
+    # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/Cityscapes/leftImg8bit/val").glob("*")]
+    # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][0:100]
     # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][2497:4994]
     # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][4994:7491]
     # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][7491:9988]
@@ -368,6 +409,7 @@ if __name__ == '__main__':
     # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][17479:]
     # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][19976:22473]
     # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][22473:]
+    content_dirs = [Path('/data/Projects/ADVENT/data/GTA5/images/14889.png')]
 
     exp_tag = "cityscapes"
     style_interpolation_weight = "1,1,1,1"
@@ -376,12 +418,12 @@ if __name__ == '__main__':
     print("style_dir",style_dir)
     style = random.sample([p for p in style_dir.glob("*")],4)
     for content in tqdm(content_dirs):
-        style_transfer_AdaIN(content=None, content_dir=content, style=style, style_dir=None,
+        style_transfer_AdaIN(content=content, content_dir=None, style=style, style_dir=None,
                              vgg_pretrain="/data/Projects/pytorch-AdaIN/models/vgg_normalised.pth",
-                             decoder_pretrain="/data/Projects/pytorch-AdaIN/experiments/decoder_iter_160000.pth.tar",
-                             vgg=vgg,decoder=decoder,do_interpolation=False,
-                             content_size=(1056, 1920), style_size=(1056, 1920), crop=None, save_ext="png",
-                             output_path="/data/Projects/ADVENT/data/Cityscapes_ambulance_styleRetrain/val/{}".\
-                                            format(style_dir.stem),
+                             # decoder_pretrain="/data/Projects/pytorch-AdaIN/experiments/decoder_iter_160000.pth.tar",
+                             decoder_pretrain='/data/Projects/pytorch-AdaIN/models/decoder.pth',
+                             vgg=vgg,decoder=decoder,do_interpolation=True,
+                             content_size=(512,1024), style_size=(512,1024), crop=None, save_ext="png",
+                             output_path='/data/Projects/MaxSquareLoss/output/style_out',
                              preserve_color=None, alpha=1.0,
                              style_interpolation_weight=style_interpolation_weight, exp_tag=exp_tag)

@@ -112,9 +112,9 @@ class City_Dataset(data.Dataset):
         synthia_set_13 = [0, 1, 2, 6, 7, 8, 10, 11, 12, 13, 15, 17, 18]
         self.trainid_to_13id = {id:i for i,id in enumerate(synthia_set_13)}
         
-        print("{} num images in Cityscapes {} set have been loaded.".format(len(self.items), self.split))
-        if self.args.numpy_transform:
-            print("use numpy_transform, instead of tensor transform!")
+        # print("{} num images in Cityscapes {} set have been loaded.".format(len(self.items), self.split))
+        # if self.args.numpy_transform:
+        #     print("use numpy_transform, instead of tensor transform!")
 
     def id2trainId(self, label, reverse=False, ignore_label=-1):
         label_copy = ignore_label * np.ones(label.shape, dtype=np.float32)
@@ -148,13 +148,18 @@ class City_Dataset(data.Dataset):
         # print("gt_image_path",gt_image_path)
         gt_image = Image.open(gt_image_path)
 
-        if ("train" in self.split or "trainval" in self.split) and self.training:
-            image_tf, gt_image = self._train_sync_transform(image, gt_image)
-        else:
-            image_tf, gt_image = self._val_sync_transform(image, gt_image)
-
         if 'style' in self.split:
             image_tf = style_transform()(image)
+            if ("train" in self.split or "trainval" in self.split) and self.training:
+                _, gt_image = self._train_sync_transform(image, gt_image)
+            else:
+                _, gt_image = self._val_sync_transform(image, gt_image)
+        else:
+            if ("train" in self.split or "trainval" in self.split) and self.training:
+                image_tf, gt_image = self._train_sync_transform(image, gt_image)
+            else:
+                image_tf, gt_image = self._val_sync_transform(image, gt_image)
+
 
         return image_tf, gt_image, item
 
@@ -240,11 +245,13 @@ class City_Dataset(data.Dataset):
             mask = mask.crop((x1, y1, x1 + crop_w, y1 + crop_h))
         elif self.resize:
             img = img.resize(self.crop_size, Image.BICUBIC)
-            mask = mask.resize(self.crop_size, Image.NEAREST)
+            if mask:
+                mask = mask.resize(self.crop_size, Image.NEAREST)
 
         # final transform
         img = self._img_transform(img)
-        mask = self._mask_transform(mask)
+        if mask:
+            mask = self._mask_transform(mask)
         return img, mask
 
     def _img_transform(self, image):

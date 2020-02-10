@@ -3,6 +3,7 @@ import sys
 import os
 
 import torch
+import pickle
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 from torchvision import transforms
@@ -10,11 +11,12 @@ import torch.utils.data as data
 from PIL import Image, ImageFile
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
+import numpy
 
 
 sys.path.append(os.path.abspath('.'))
 
-from utils.train_helper import decoder,vgg,Net
+from utils.train_helper import Net
 from utils.loss import *
 from datasets.cityscapes_Dataset import City_Dataset, City_DataLoader, inv_preprocess, decode_labels
 from datasets.gta5_Dataset import GTA5_Dataset,FlatFolderDataset
@@ -102,11 +104,13 @@ class UDATrainer(Trainer):
             transform=ADAIN_transform())
 
         self.style_dataloader=iter(data.DataLoader(style_dataset,
-                                              batch_size=4,
-                                              shuffle=True,
-                                              num_workers=self.args.data_loader_workers,
-                                              pin_memory=self.args.pin_memory,
-                                              drop_last=True))
+                              batch_size=4,
+                              shuffle=False,
+                              num_workers=self.args.data_loader_workers,
+                              pin_memory=self.args.pin_memory,
+                              drop_last=True))
+
+        self.batch_style = next(self.style_dataloader).cuda()
 
         self.dataloader.val_loader = self.target_val_dataloader
 
@@ -141,12 +145,12 @@ class UDATrainer(Trainer):
         self.target_hard_loss = nn.CrossEntropyLoss(ignore_index=-1)
 
         ## initially add network parameters into
-        allparams = self.params+[{'params':self.network.parameters(),'lr':self.args.lr}]
-
-        self.all_optimizer = torch.optim.Adam(
-             allparams,
-             betas=(0.9, 0.99),
-             weight_decay=self.args.weight_decay)
+        # allparams = self.params+[{'params':self.network.parameters(),'lr':self.args.lr}]
+        #
+        # self.all_optimizer = torch.optim.Adam(
+        #      allparams,
+        #      betas=(0.9, 0.99),
+        #      weight_decay=self.args.weight_decay)
         self.adain_optimizer = torch.optim.Adam(
             self.network.parameters(),
             lr=self.args.lr,
@@ -164,17 +168,24 @@ class UDATrainer(Trainer):
             for line in content:
                 f.write(line)
 
-    def save_tensor_as_Image(self,tensor,path,name):
+    def save_tensor_as_Image(self,tensor,path,filename, cnt,nrow=8, padding=2,
+               normalize=False, range=None, scale_each=False, pad_value=0):
         if not os.path.exists(path):
             os.makedirs(path)
 
-        image = tensor.cpu().clone()  # we clone the tensor to not do changes on it
-        image = image.squeeze(0)  # remove the fake batch dimension
-        image = transforms.ToPILImage()(image)
-        image.save(os.path.join(path,
-                                name+'_epoch{}_stywt{}-loss_c{:.1}-loss_stl{:.1}.png'
-                                .format(self.current_epoch,self.style_loss_weight,
-                                        self.loss_c,self.loss_s)))
+        from PIL import Image
+        from utils.train_helper import make_grid
+        image = tensor.cpu().clone()
+        grid = make_grid(image, nrow=nrow, padding=padding, pad_value=pad_value,
+                         normalize=normalize, range=range, scale_each=scale_each)
+        # Add 0.5 after unnormalizing to [0, 255] to round to nearest integer
+        ndarr = grid.mul_(255).add_(0.5).clamp_(0, 255).permute(1, 2, 0).to('cpu', torch.uint8).numpy()
+        im = Image.fromarray(ndarr)
+        outpath = os.path.join(path,filename)
+        if cnt%100 == 0:
+            im.save(outpath)
+        return im
+
 
     def train_target(self, pred):
         if isinstance(pred, tuple):
@@ -237,9 +248,9 @@ class UDATrainer(Trainer):
 
     def main(self):
         # display args details
-        self.logger.info("Global configuration as follows:")
-        for key, val in vars(self.args).items():
-            self.logger.info("{:16} {}".format(key, val))
+        # self.logger.info("Global configuration as follows:")
+        # for key, val in vars(self.args).items():
+        #     self.logger.info("{:16} {}".format(key, val))
 
         # load pretrained checkpoint
         if self.args.checkpoint_dir is not None:
@@ -257,7 +268,6 @@ class UDATrainer(Trainer):
             self.best_source_iter = self.current_iter  # the best iteration for source
 
         self.args.iter_max = self.current_iter + self.dataloader.num_iterations * self.args.epoch_each_round * self.round_num
-        print(self.args.iter_max, self.dataloader.num_iterations)
 
         # train
         # self.validate() # check image summary
@@ -283,8 +293,6 @@ class UDATrainer(Trainer):
             self.current_round += 1
 
     def train_one_epoch(self,epoch=0):
-        # self.save_shuffled_list()  # shuffle the id.txt every epoch
-
         tqdm_epoch = tqdm(zip(self.source_dataloader, self.target_dataloader),
                           total=self.dataloader.num_iterations,
                           desc="Train Round-{}-Epoch-{}-total-{}". \
@@ -300,22 +308,19 @@ class UDATrainer(Trainer):
         self.loss_target_value_2 = 0
         self.iter_num = self.dataloader.num_iterations
 
-        # Set the modelmodel to be in training mode (for batchnorm and dropout)
+        # Set the model to be in training mode (for batchnorm and dropout)
         if self.args.freeze_bn:
             self.model.eval()
             self.logger.info("freeze batch normalization successfully!")
         else:
             self.model.train()
 
-        batch_idx = 0  # iter in the data
-        batch_style = next(self.style_dataloader).cuda()
-        self.batch_style = batch_style
         self.style_loss_weight = 5
 
         # print('self.args.numpy_transform is ', self.args.numpy_transform) True
         for batch_s, batch_t in tqdm_epoch:
             self.poly_lr_scheduler(optimizer=self.optimizer, init_lr=self.args.lr)
-            self.poly_lr_scheduler(optimizer = self.all_optimizer, init_lr = self.args.lr)
+            # self.poly_lr_scheduler(optimizer = self.all_optimizer, init_lr = self.args.lr)
             self.poly_lr_scheduler(optimizer=self.adain_optimizer,init_lr=self.args.lr)
 
             ############################################
@@ -323,88 +328,57 @@ class UDATrainer(Trainer):
             ############################################
             ## source ##
             content,_,__ = batch_s
-            self.loss_c,self.loss_s = self.network(content,batch_style)
+            trans_source = self.network(content,self.batch_style,
+             save_path='/data/Projects/MaxSquareLoss/output/adain_out/source_test.txt',)
 
-            ADAIN_loss = self.loss_c+self.style_loss_weight*self.loss_s
+            trans_source_img = self.save_tensor_as_Image(tensor=trans_source,
+                                      path=os.path.join(self.args.save_dir,"picResult"),
+                                      filename='source_trans_epoch{}_curiter{}_stywt{}.png'.format(self.current_epoch,
+                                                        self.current_iter,self.style_loss_weight),
+                                      cnt=self.current_iter)
 
-            self.writer.add_scalar('content_loss_source', self.loss_c, self.current_epoch)
-            self.writer.add_scalar('style_loss_source', self.loss_s, self.current_epoch)
-            # self.logger.info('finish ADAIN source')
 
             ## target
             content, _, __ = batch_t
+            trans_target= self.network(content,self.batch_style,
+                        save_path='/data/Projects/MaxSquareLoss/output/adain_out/target_test.txt')
 
-            self.loss_c, self.loss_s= self.network(content, batch_style)
-
-            self.writer.add_scalar('content_loss_target', self.loss_c, self.current_epoch)
-            self.writer.add_scalar('style_loss_target', self.loss_s, self.current_epoch)
-
-            ADAIN_loss += self.loss_c + self.style_loss_weight * self.loss_s
-            self.adain_optimizer.zero_grad()
-            ADAIN_loss.backward()
-            self.adain_optimizer.step()
-
-            self.writer.add_scalar('total_loss_srctgt',ADAIN_loss,self.current_epoch)
-            # self.logger.info('finish ADAIN target')
+            trans_target_img = self.save_tensor_as_Image(tensor=trans_target,
+                                      path=os.path.join(self.args.save_dir,"picResult"),
+                                      filename='target_trans_epoch{}_curiter{}_stywt{}.png'.format(self.current_epoch,
+                                                 self.current_iter,self.style_loss_weight),
+                                      cnt=self.current_iter)
 
             ##########################
             # source supervised loss #
             ##########################
             # train with source
-            x, y, _ = batch_s
-            trans_source = self.network.test(x,batch_style)
+            _, y, _ = batch_s
+            x = trans_source_img
+            x = self.source_dataset._train_sync_transform(x,None).unsqueeze(0)
 
-            if batch_idx%10==0:
-                self.save_tensor_as_Image(tensor=x,
-                                          path=os.path.join(self.args.save_dir,
-                                                          "picResult"),
-                                          name="source")
-                self.save_tensor_as_Image(tensor=trans_source,
-                                          path=os.path.join(self.args.save_dir,
-                                                            "picResult"),
-                                          name="source_trans")
-
-            # print('trans_source size is ',trans_source.size())
-            x = trans_source
-            x = self.source_dataset._train_sync_transform(
-                        transforms.ToPILImage()(x.squeeze(0).cpu()),None).unsqueeze(0)
             if self.cuda:
                 x, y = Variable(x).to(self.device), \
                        Variable(y).to(device=self.device, dtype=torch.long)
 
             pred = self.model(x)
             self.train_source(pred, y)
-
             #####################
             # train with target #
             #####################
-            x, _, _ = batch_t
-            trans_target = self.network.test(x,batch_style)
-
-            if batch_idx%10==0:
-                self.save_tensor_as_Image(tensor=x,
-                                          path=os.path.join(self.args.save_dir,
-                                                          "picResult"),
-                                          name="target")
-                self.save_tensor_as_Image(tensor=trans_target,
-                                          path=os.path.join(self.args.save_dir,
-                                                            "picResult"),
-                                          name="target_trans")
-
-            # print('trans_target size is ',trans_target.size())
-            x = trans_target
-            x = self.target_data_set._train_sync_transform(
-                        transforms.ToPILImage()(x.squeeze(0).cpu()),None).unsqueeze(0)
+            x = trans_target_img
+            x = self.target_data_set._train_sync_transform(x,None).unsqueeze(0)
             if self.cuda:
                 x = Variable(x).to(self.device)
-            pred = self.model(x)
 
+            pred = self.model(x)
             self.train_target(pred)
 
             self.optimizer.step()
             self.optimizer.zero_grad()
 
-            batch_idx += 1
+            self.adain_optimizer.step()
+            self.adain_optimizer.zero_grad()
 
             self.current_iter += 1
 
@@ -422,7 +396,7 @@ class UDATrainer(Trainer):
         tqdm_epoch.close()
 
         # eval on source domain
-        self.validate_source()
+        # self.validate_source()
         self.logger.info("learning rate for epoch {} is  {}".
                          format(self.current_epoch, self.optimizer.param_groups[0]["lr"]))
 
