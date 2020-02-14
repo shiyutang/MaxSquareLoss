@@ -317,9 +317,12 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
 
     content_tf = test_transform(content_size,crop)
     style_tf = test_transform(style_size,crop)
+    # print(output_dir,content_paths)
 
     for i,content_path in enumerate(content_paths):
         out_name = Path.joinpath(output_dir,str(content_path.stem)+".{}".format(save_ext))
+        # print(out_name)
+
         if out_name.exists():
             continue
         if do_interpolation:
@@ -330,7 +333,7 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
 
             with torch.no_grad():
                 output_Tensor = style_transfer(vgg,decoder,content,style,alpha,device,
-                                            interpolation_weight)
+                                               interpolation_weight)
 
             output_Tensor.cpu()
             out_name = Path.joinpath(output_dir,str(content_path.stem)+".{}".format(save_ext))
@@ -348,7 +351,7 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
                 with torch.no_grad():
                     output_Tensor = style_transfer(vgg,decoder,content,style,alpha,device)
                 output_Tensor = output_Tensor.cpu()
-                out_name = os.path.join(output_dir,"{}_stylized_{}.{}"\
+                out_name = os.path.join(output_dir,"{}_stylized_{}.{}" \
                                         .format(content_path.stem,style_path.stem,save_ext))
                 save_image(output_Tensor,out_name)
 
@@ -357,15 +360,16 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
 
 
 if __name__ == '__main__':
-    content_dirs = [f for f in Path("/data/Projects/ADVENT/data/Cityscapes/leftImg8bit/val").glob("*")]
-    # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][0:9988]
+    # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/Cityscapes/leftImg8bit/val").glob("*")]  # frankfurt
+    # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/Cityscapes/leftImg8bit/train").glob("*")]
+    # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][0:12485]
     # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][2497:4994]
     # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][4994:7491]
     # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][7491:9988]
-    # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][9988:17479]
-    # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][12485:14982]
+    # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][9988:12485]
+    content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][12485:]
     # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][14982:17479]
-    # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][17479:]
+    # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][17479:19976]
     # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][19976:22473]
     # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][22473:]
 
@@ -373,15 +377,17 @@ if __name__ == '__main__':
     style_interpolation_weight = "1,1,1,1"
 
     style_dir= Path("/data/Projects/MaxSquareLoss/imagenet_style/ambulance")#style_dirs[4]
-    print("style_dir",style_dir)
+    # print("content_dir",content_dirs)
     style = random.sample([p for p in style_dir.glob("*")],4)
     for content in tqdm(content_dirs):
-        style_transfer_AdaIN(content=None, content_dir=content, style=style, style_dir=None,
-                             vgg_pretrain="/data/Projects/pytorch-AdaIN/models/vgg_normalised.pth",
-                             decoder_pretrain="/data/Projects/pytorch-AdaIN/experiments/decoder_iter_160000.pth.tar",
-                             vgg=vgg,decoder=decoder,do_interpolation=False,
-                             content_size=(1056, 1920), style_size=(1056, 1920), crop=None, save_ext="png",
-                             output_path="/data/Projects/ADVENT/data/Cityscapes_ambulance_styleRetrain/val/{}".\
-                                            format(style_dir.stem),
-                             preserve_color=None, alpha=1.0,
-                             style_interpolation_weight=style_interpolation_weight, exp_tag=exp_tag)
+        style_transfer_AdaIN(
+         content=content, content_dir=None, style=style, style_dir=None,
+         vgg_pretrain="/data/Projects/pytorch-AdaIN/models/vgg_normalised.pth",
+         decoder_pretrain="/data/Projects/pytorch-AdaIN/experiments/gta5pcity_ambulance_alpha1wts1/decoder_iter_160000.pth.tar",
+         vgg=vgg,decoder=decoder,do_interpolation=False,
+         content_size=(1052, 1914), style_size=(1052, 1914), crop=None, save_ext="png",
+         # output_path="/data/Projects/ADVENT/data/Cityscapes_ambulance_gta5pcity_retrain_alpha1stylewt1/leftImg8bit/val/{}".\
+                        # format(content.stem),
+         output_path='/data/Projects/ADVENT/data/GTA5_ambulance_gta5pcity_retrain_alpha1stylewt1/images/',
+         preserve_color=None, alpha=1.0,
+         style_interpolation_weight=style_interpolation_weight, exp_tag=exp_tag)

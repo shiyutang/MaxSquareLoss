@@ -182,9 +182,9 @@ class UDATrainer(Trainer):
 
     def main(self):
         # display args details
-        self.logger.info("Global configuration as follows:")
-        for key, val in vars(self.args).items():
-            self.logger.info("{:16} {}".format(key, val))
+        # self.logger.info("Global configuration as follows:")
+        # for key, val in vars(self.args).items():
+        #     self.logger.info("{:16} {}".format(key, val))
 
         # load pretrained checkpoint
         if self.args.checkpoint_dir is not None:
@@ -302,8 +302,8 @@ class UDATrainer(Trainer):
 
         # eval on source domain
         self.validate_source()
-        self.logger.info("learning rate for epoch {} is  {}".
-                         format(self.current_epoch, self.optimizer.param_groups[0]["lr"]))
+        # self.logger.info("learning rate for epoch {} is  {}".
+        #                  format(self.current_epoch, self.optimizer.param_groups[0]["lr"]))
 
 
 def add_UDA_train_args(arg_parser):
@@ -349,17 +349,17 @@ if __name__ == '__main__':
     args.target_dataset = args.dataset
 
     train_id = str(args.source_dataset) + "2" + str(args.target_dataset) + "_" + args.target_mode
-    styles_source, styles_target = [], []
-    for f in Path("/data/Projects/ADVENT/data").glob("*"):
-        if "GTA5_" in str(f):
-            styles_source.append(f.stem)
-        elif "Cityscapes_" in str(f):
-            styles_target.append(f.stem)
+    # styles_source, styles_target = [], []
+    # for f in Path("/data/Projects/ADVENT/data").glob("*"):
+    #     if "GTA5_" in str(f):
+    #         styles_source.append(f.stem)
+    #     elif "Cityscapes_" in str(f):
+    #         styles_target.append(f.stem)
 
-    styles_source=['GTA5_ambulance_styleRetrain']
-    styles_target = ['Cityscapes_ambulance_styleRetrain']
+    styles_source=['GTA5_ambulance_gta5pcity_retrain_alpha1stylewt1']
+    styles_target = ['Cityscapes_ambulance_gta5pcity_retrain_alpha1stylewt1']
 
-    logger.info("styles_souce,style_target", styles_source, styles_target)
+    # logger.info("styles_souce,style_target", styles_source, styles_target)
 
     agent = UDATrainer(args=args, cuda=True, train_id=train_id,
                        logger=logger, datasets_path=datasets_path,
