@@ -63,7 +63,8 @@ class Evaluater():
 
         # dataloader
         # print("args.data_root_path",args.data_root_path,self.args.list_path)
-        self.dataloader = City_DataLoader(self.args) if self.args.dataset=="cityscapes" else GTA5_DataLoader(self.args)
+        self.dataloader = City_DataLoader(self.args,datasets_path=datasets_path['Cityscapes_ambulance_gta5pcity_retrain_alpha1stylewt1']) \
+                            if self.args.dataset=="cityscapes" else GTA5_DataLoader(self.args,datasets_path=datasets_path[self.args.dataset])
         if self.args.city_name != "None":
             target_data_set = CrossCity_Dataset(self.args, 
                                     data_root_path=self.args.data_root_path,
@@ -150,8 +151,8 @@ class Evaluater():
                 if i % 20 ==0 and self.args.image_summary:
                     #show val result on tensorboard
                     images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images, numpy_transform=self.args.numpy_transform)
-                    labels_colors = decode_labels(label, self.args.show_num_images)
-                    preds_colors = decode_labels(argpred, self.args.show_num_images)
+                    labels_colors,_ = decode_labels(label, self.args.show_num_images)
+                    preds_colors,_  = decode_labels(argpred, self.args.show_num_images)
                     for index, (img, lab, color_pred) in enumerate(zip(images_inv, labels_colors, preds_colors)):
                         self.writer.add_image('eval/'+ str(index)+'/Images', img, self.current_epoch)
                         self.writer.add_image('eval/'+ str(index)+'/Labels', lab, self.current_epoch)
@@ -160,8 +161,8 @@ class Evaluater():
             #show val result on tensorboard
             if self.args.image_summary:
                 images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images, numpy_transform=self.args.numpy_transform)
-                labels_colors = decode_labels(label, self.args.show_num_images)
-                preds_colors = decode_labels(argpred, self.args.show_num_images)
+                labels_colors,_  = decode_labels(label, self.args.show_num_images)
+                preds_colors,_  = decode_labels(argpred, self.args.show_num_images)
                 for index, (img, lab, color_pred) in enumerate(zip(images_inv, labels_colors, preds_colors)):
                     self.writer.add_image('0Images/'+str(index), img, self.current_epoch)
                     self.writer.add_image('a'+str(index)+'/Labels', lab, self.current_epoch)
@@ -189,7 +190,7 @@ class Evaluater():
                 def val_info(Eval, name):
                     PA = Eval.Pixel_Accuracy()
                     MPA = Eval.Mean_Pixel_Accuracy()
-                    MIoU = Eval.Mean_Intersection_over_Union()
+                    MIoU,_ = Eval.Mean_Intersection_over_Union()
                     FWIoU = Eval.Frequency_Weighted_Intersection_over_Union()
                     PC = Eval.Mean_Precision()
                     print("########## Eval{} ############".format(name))

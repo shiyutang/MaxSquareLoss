@@ -39,6 +39,29 @@ label_colours = [
         [  0,   0,   0]] # the color of ignored label(-1) 
 label_colours = list(map(tuple, label_colours))
 
+name_classes = [
+    'road',
+    'sidewalk',
+    'building',
+    'wall',
+    'fence',
+    'pole',
+    'trafflight',
+    'traffsign',
+    'vegetation',
+    'terrain',
+    'sky',
+    'person',
+    'rider',
+    'car',
+    'truck',
+    'bus',
+    'train',
+    'motorcycle',
+    'bicycle',
+    'unlabeled'
+]
+
 class City_Dataset(data.Dataset):
     def __init__(self,
                  args,
@@ -141,7 +164,7 @@ class City_Dataset(data.Dataset):
         else:
             image, gt_image = self._val_sync_transform(image, gt_image)
 
-        return image, gt_image, item
+        return image, gt_image, id
 
     def _train_sync_transform(self, img, mask):
         '''
@@ -357,30 +380,9 @@ def decode_labels(mask, num_images=1, num_classes=NUM_CLASSES):
               if k < num_classes:
                   pixels[k_,j_] = label_colours[k]
       outputs[i] = np.array(img)
-    return torch.from_numpy(outputs.transpose([0, 3, 1, 2]).astype('float32')).div_(255.0)
+    return torch.from_numpy(outputs.transpose([0, 3, 1, 2]).astype('float32')).div_(255.0),img
     
-name_classes = [
-    'road',
-    'sidewalk',
-    'building',
-    'wall',
-    'fence',
-    'pole',
-    'trafflight',
-    'traffsign',
-    'vegetation',
-    'terrain',
-    'sky',
-    'person',
-    'rider',
-    'car',
-    'truck',
-    'bus',
-    'train',
-    'motorcycle',
-    'bicycle',
-    'unlabeled'
-]
+
 
 def inspect_decode_labels(pred, num_images=1, num_classes=NUM_CLASSES, 
         inspect_split=[0.9, 0.8, 0.7, 0.5, 0.0], inspect_ratio=[1.0, 0.8, 0.6, 0.3]):

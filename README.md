@@ -102,13 +102,13 @@ We present several transfered results reported in our paper and provide the corr
 
 
 ```
-rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/train_source.py --gpu "0" --dataset 'gta5' --checkpoint_dir "./log/gta5_pretrain/" --iter_max 200000 --iter_stop 80000 --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --crop_size "1280,720"
+rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/train_source.py --gpu "0" --dataset 'gta5' --checkpoint_dir "./log/gta5_pretrain/" --iter_max 200000 --iter_stop 80000 --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --crop_size "1280,640"
 ```
 
 Pretrain the multi-level model on the source domain (GTA5) by adding "--multi True". 
 
 ```
-rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/train_source.py --gpu "0" --dataset 'gta5' --checkpoint_dir "./log/train/add_multi" --iter_max 200000 --iter_stop 80000 --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --crop_size "1280,720" --multi True
+rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/train_source.py --gpu "0" --dataset 'gta5' --checkpoint_dir "./log/train/add_multi" --iter_max 200000 --iter_stop 80000 --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --crop_size "1280,640" --multi True
 ```
 
 Otherwise, download the [checkpoint](https://drive.google.com/open?id=1KP37cQo_9NEBczm7pvq_zEmmosdhxvlF) pretrained on GTA5 in "Setup" section.

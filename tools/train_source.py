@@ -36,14 +36,6 @@ datasets_path={
                    'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
                    'image_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_styleRetrain/leftImg8bit',
                    'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
-    'Cityscapes_church': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_church',
-                   'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
-                   'image_path': '/data/Projects/ADVENT/data/Cityscapes_church/leftImg8bit',
-                   'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
-    'Cityscapes_elephant': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_elephant',
-                   'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
-                   'image_path': '/data/Projects/ADVENT/data/Cityscapes_elephant/leftImg8bit',
-                   'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
     'Cityscapes_ambulance_retrain_alpha0p5wts10':
         {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_retrain_alpha0p5wts10',
                    'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
@@ -59,6 +51,16 @@ datasets_path={
          'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
          'image_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_gta5pcity_retrain_alpha1stylewt1/leftImg8bit',
          'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
+    'Cityscapes_ambulance_gta5pcity_retrain_alpha1wts0p5':
+        {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_gta5pcity_retrain_alpha1wts0p5',
+         'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
+         'image_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_gta5pcity_retrain_alpha1wts0p5/leftImg8bit',
+         'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
+    'Cityscapes_cityscapes_standard':
+        {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_cityscapes_standard',
+         'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
+         'image_path': '/data/Projects/ADVENT/data/Cityscapes_cityscapes_standard/leftImg8bit',
+         'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
     'gta5': {'data_root_path': '/data/Projects/ADVENT/data/GTA5', 'list_path': '/data/Projects/ADVENT/data/GTA5',
                     'image_path':'/data/Projects/ADVENT/data/GTA5/images',
                     'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
@@ -68,14 +70,6 @@ datasets_path={
     'GTA5_ambulance_styleRetrain': {'data_root_path': '/data/Projects/ADVENT/data/GTA5_ambulance_styleRetrain',
                         'list_path': '/data/Projects/ADVENT/data/GTA5',
                        'image_path': '/data/Projects/ADVENT/data/GTA5_ambulance_styleRetrain/images',
-                       'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
-    'GTA5_church': {'data_root_path': '/data/Projects/ADVENT/data/GTA5_church',
-                       'list_path': '/data/Projects/ADVENT/data/GTA5',
-                       'image_path': '/data/Projects/ADVENT/data/GTA5_church/images',
-                       'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
-    'GTA5_elephant': {'data_root_path': '/data/Projects/ADVENT/data/GTA5_elephant',
-                       'list_path': '/data/Projects/ADVENT/data/GTA5',
-                       'image_path': '/data/Projects/ADVENT/data/GTA5_elephant/images',
                        'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
     'GTA5_ambulance_retrain_alpha0p5wts10':
                 {'data_root_path': '/data/Projects/ADVENT/data/GTA5_ambulance_retrain_alpha0p5wts10',
@@ -92,6 +86,17 @@ datasets_path={
          'list_path': '/data/Projects/ADVENT/data/GTA5',
          'image_path': '/data/Projects/ADVENT/data/GTA5_ambulance_gta5pcity_retrain_alpha1stylewt1/images',
          'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
+    'GTA5_ambulance_gta5pcity_retrain_alpha1stylewt0p5':
+        {'data_root_path': '/data/Projects/ADVENT/data/GTA5_ambulance_gta5pcity_retrain_alpha1stylewt0p5',
+         'list_path': '/data/Projects/ADVENT/data/GTA5',
+         'image_path': '/data/Projects/ADVENT/data/GTA5_ambulance_gta5pcity_retrain_alpha1stylewt0p5/images',
+         'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
+    'GTA5_cityscapes_standard':
+        {'data_root_path': '/data/Projects/ADVENT/data/GTA5_cityscapes_standard',
+         'list_path': '/data/Projects/ADVENT/data/GTA5',
+         'image_path': '/data/Projects/ADVENT/data/GTA5_cityscapes_standard/images',
+         'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
+
     'synthia': {'data_root_path': '/data/Projects/ADVENT/data/SYNTHIA', 'list_path': '/data/Projects/ADVENT/data/SYNTHIA/list',
                     'image_path':'/data/Projects/ADVENT/data/SYNTHIA/RGB',
                     'gt_path': '/data/Projects/ADVENT/data/GT/LABELS'},
@@ -121,6 +126,7 @@ class Trainer():
 
         self.current_MIoU = 0
         self.best_MIou = 0
+        self.best_FWIou=0
         self.best_source_MIou = 0
         self.current_epoch = 0
         self.current_iter = 0
@@ -214,11 +220,17 @@ class Trainer():
                 self.best_MIou = MIoU
                 self.best_iter = self.current_iter
                 self.logger.info("=>saving a new best checkpoint...")
-                self.save_checkpoint(self.train_id+'best.pth')
+                self.save_checkpoint(self.train_id+'mIOUbest.pth')
             else:
                 self.logger.info("=> The MIoU of val does't improve.")
                 self.logger.info("=> The best MIoU of val is {} at {}".format(self.best_MIou, self.best_iter))
-            
+
+            is_fwIOU_best = FWIoU > self.best_FWIou
+            if is_fwIOU_best:
+                self.best_FWIou= FWIoU
+                self.logger.info("=>saving a new best FWIOU checkpoint...")
+                self.save_checkpoint(self.train_id+'fwIOUbest.pth')
+
             self.current_epoch += 1
 
         self.logger.info("=>best_MIou {} at {}".format(self.best_MIou, self.best_iter))
@@ -313,8 +325,8 @@ class Trainer():
     def log_one_train_epoch(self, x, label, argpred, train_loss):
         #show train image on tensorboard
         images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images, numpy_transform=self.args.numpy_transform)
-        labels_colors = decode_labels(label, self.args.show_num_images)
-        preds_colors = decode_labels(argpred, self.args.show_num_images)
+        labels_colors,_  = decode_labels(label, self.args.show_num_images)
+        preds_colors,_  = decode_labels(argpred, self.args.show_num_images)
         for index, (img, lab, color_pred) in enumerate(zip(images_inv, labels_colors, preds_colors)):
             self.writer.add_image('train/'+ str(index)+'/Images', img, self.current_epoch)
             self.writer.add_image('train/'+ str(index)+'/Labels', lab, self.current_epoch)
@@ -328,7 +340,7 @@ class Trainer():
         else:
             PA = self.Eval.Pixel_Accuracy()
             MPA = self.Eval.Mean_Pixel_Accuracy()
-            MIoU = self.Eval.Mean_Intersection_over_Union()
+            MIoU,_ = self.Eval.Mean_Intersection_over_Union()
             FWIoU = self.Eval.Frequency_Weighted_Intersection_over_Union()
 
         self.logger.info('\nEpoch:{}, train PA1:{}, MPA1:{}, MIoU1:{}, FWIoU1:{}'.format(self.current_epoch, PA, MPA,
@@ -350,13 +362,9 @@ class Trainer():
                               desc="Val Epoch-{}-".format(self.current_epoch + 1))
             if mode == 'val':
                 self.model.eval()
-            
-            i = 0
-
             for x, y, id in tqdm_batch:
                 if self.cuda:
                     x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
-
                 # model
                 pred = self.model(x)                   
                 if isinstance(pred, tuple):
@@ -366,18 +374,16 @@ class Trainer():
                     pred_P_2 = F.softmax(pred_2, dim=1)
                 y = torch.squeeze(y, 1)
 
-
                 pred = pred.data.cpu().numpy()
                 label = y.cpu().numpy()
                 argpred = np.argmax(pred, axis=1)
 
                 self.Eval.add_batch(label, argpred)
-                
 
             #show val result on tensorboard
             images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images, numpy_transform=self.args.numpy_transform)
-            labels_colors = decode_labels(label, self.args.show_num_images)
-            preds_colors = decode_labels(argpred, self.args.show_num_images)
+            labels_colors,_  = decode_labels(label, self.args.show_num_images)
+            preds_colors,_  = decode_labels(argpred, self.args.show_num_images)
             for index, (img, lab, color_pred) in enumerate(zip(images_inv, labels_colors, preds_colors)):
                 self.writer.add_image(str(index)+'/Images', img, self.current_epoch)
                 self.writer.add_image(str(index)+'/Labels', lab, self.current_epoch)
@@ -408,7 +414,7 @@ class Trainer():
                 def val_info(Eval, name):
                     PA = Eval.Pixel_Accuracy()
                     MPA = Eval.Mean_Pixel_Accuracy()
-                    MIoU = Eval.Mean_Intersection_over_Union()
+                    MIoU,_ = Eval.Mean_Intersection_over_Union()
                     FWIoU = Eval.Frequency_Weighted_Intersection_over_Union()
                     PC = Eval.Mean_Precision()
                     print("########## Eval{} ############".format(name))
@@ -425,6 +431,87 @@ class Trainer():
             tqdm_batch.close()
 
         return PA, MPA, MIoU, FWIoU
+
+    def getvalResult(self, outputPath, savePics):
+        self.logger.info('\nget result one epoch...')
+        self.Eval.reset()
+
+        def val_info(Eval, name):
+            PA = Eval.Pixel_Accuracy()
+            MPA = Eval.Mean_Pixel_Accuracy()
+            MIoU,_ = Eval.Mean_Intersection_over_Union()
+            FWIoU = Eval.Frequency_Weighted_Intersection_over_Union()
+            PC = Eval.Mean_Precision()
+            print("########## Eval{} ############".format(name))
+
+            self.logger.info(
+                '\nEpoch:{:.3f}, {} PA1:{:.3f}, MPA1:{:.3f}, MIoU1:{:.3f}, FWIoU1:{:.3f}, PC:{:.3f}'.format(
+                    self.current_epoch, name, PA, MPA,
+                    MIoU, FWIoU, PC))
+            self.writer.add_scalar('PA' + name, PA, self.current_epoch)
+            self.writer.add_scalar('MPA' + name, MPA, self.current_epoch)
+            self.writer.add_scalar('MIoU' + name, MIoU, self.current_epoch)
+            self.writer.add_scalar('FWIoU' + name, FWIoU, self.current_epoch)
+            return PA, MPA, MIoU, FWIoU
+
+        with torch.no_grad():
+            tqdm_batch = tqdm(self.dataloader.val_loader, total=self.dataloader.valid_iterations,
+                              desc="Val Epoch-{}-".format(self.current_epoch + 1))
+            self.model.eval()
+            id2mIOU = []
+
+            for x, y, id in tqdm_batch:
+                if self.cuda:
+                    x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
+                # model
+                pred = self.model(x)
+                if isinstance(pred, tuple):
+                    pred = pred[0]
+
+                y = torch.squeeze(y, 1)
+
+                pred = pred.data.cpu().numpy()
+                label = y.cpu().numpy()
+                argpred = np.argmax(pred, axis=1)
+
+                self.Eval.add_batch(label, argpred)
+                PA, MPA, MIoU, FWIoU = val_info(self.Eval, "")
+                id2mIOU.append((id, PA, MPA, MIoU, FWIoU))
+                self.Eval.reset()
+
+            id2mIOU = sorted(id2mIOU, key=lambda id2mIOU: id2mIOU[3])
+            saveId = {}
+            for i in range(savePics):
+                saveId[id2mIOU[i][0]] = id2mIOU[i]
+
+            for x, y, id in tqdm_batch:
+                if not id in saveId:
+                    break
+                base_out_path = os.path.join(outputPath,
+                         '{}_PA_{:.2f}_MPA_{:.2f}_MIoU_{:.2f}_FWIoU_{:.2f}_'.format(saveId[id][0],
+                               saveId[id][1],saveId[id][2],saveId[id][3],saveId[id][4]))
+
+                if self.cuda:
+                    x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
+                # model
+                pred = self.model(x)
+                if isinstance(pred, tuple):
+                    pred = pred[0]
+                y = torch.squeeze(y, 1)
+                pred = pred.data.cpu().numpy()
+                label = y.cpu().numpy()
+                argpred = np.argmax(pred, axis=1)
+
+                images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images, numpy_transform=self.args.numpy_transform)
+                labels_colors,label_img = decode_labels(label, self.args.show_num_images)
+                preds_colors,pred_img = decode_labels(argpred, self.args.show_num_images)
+                images_inv.save(base_out_path+'style_img.png')
+                label_img.save(base_out_path+'label_img.png')
+                pred_img.save(base_out_path+'pred_img.png')
+
+            tqdm_batch.close()
+
+        return id2mIOU
 
     def validate_source(self):
         self.logger.info('\nvalidating source domain...')
@@ -461,8 +548,8 @@ class Trainer():
 
             #show val result on tensorboard
             images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images, numpy_transform=self.args.numpy_transform)
-            labels_colors = decode_labels(label, self.args.show_num_images)
-            preds_colors = decode_labels(argpred, self.args.show_num_images)
+            labels_colors,_  = decode_labels(label, self.args.show_num_images)
+            preds_colors,_  = decode_labels(argpred, self.args.show_num_images)
             for index, (img, lab, color_pred) in enumerate(zip(images_inv, labels_colors, preds_colors)):
                 self.writer.add_image('source_eval/'+str(index)+'/Images', img, self.current_epoch)
                 self.writer.add_image('source_eval/'+str(index)+'/Labels', lab, self.current_epoch)
@@ -493,7 +580,7 @@ class Trainer():
                 def source_val_info(Eval, name):
                     PA = Eval.Pixel_Accuracy()
                     MPA = Eval.Mean_Pixel_Accuracy()
-                    MIoU = Eval.Mean_Intersection_over_Union()
+                    MIoU,_ = Eval.Mean_Intersection_over_Union()
                     FWIoU = Eval.Frequency_Weighted_Intersection_over_Union()
                     PC = Eval.Mean_Precision()
 
@@ -536,7 +623,8 @@ class Trainer():
             'iteration': self.current_iter,
             'state_dict': self.model.state_dict(),
             'optimizer': self.optimizer.state_dict(),
-            'best_MIou':self.best_MIou
+            'best_MIou':self.best_MIou,
+            'best_FWIOU':self.best_FWIou
         }
         torch.save(state, filename)
 
@@ -556,6 +644,7 @@ class Trainer():
                 self.current_epoch = checkpoint["epoch"]
                 self.current_iter = checkpoint["iteration"]
                 self.best_MIou = checkpoint["best_MIou"]
+
 
         except OSError as e:
             self.logger.info("No checkpoint exists from '{}'. Skipping...".format(self.args.checkpoint_dir))
@@ -615,13 +704,13 @@ def add_train_args(arg_parser):
     # dataset related arguments
     arg_parser.add_argument('--dataset', default='cityscapes', type=str,
                             help='dataset choice')
-    arg_parser.add_argument('--base_size', default="1280,720", type=str, # for random crop
+    arg_parser.add_argument('--base_size', default="1280,640", type=str, # for random crop
                             help='crop size of image')
-    arg_parser.add_argument('--crop_size', default="1280,720", type=str,
+    arg_parser.add_argument('--crop_size', default="1280,640", type=str,
                             help='base size of image')
-    arg_parser.add_argument('--target_base_size', default="1280,720", type=str, # for random crop
+    arg_parser.add_argument('--target_base_size', default="1280,640", type=str, # for random crop
                             help='crop size of target image')
-    arg_parser.add_argument('--target_crop_size', default="1280,720", type=str,
+    arg_parser.add_argument('--target_crop_size', default="1280,640", type=str,
                             help='base size of target image')
     arg_parser.add_argument('--num_classes', default=19, type=int,
                             help='num class of mask')
@@ -696,13 +785,6 @@ def init_args(args):
     else:
         args.target_crop_size = (int(target_crop_size[0]), int(target_crop_size[1]))
         args.target_base_size = (int(target_base_size[0]), int(target_base_size[1]))
-
-    # if not args.continue_training:
-        # if os.path.exists(args.checkpoint_dir):
-        #     print("checkpoint dir exists, which will be removed")
-        #     import shutil
-        #     shutil.rmtree(args.checkpoint_dir, ignore_errors=True)
-        # os.mkdir(args.checkpoint_dir)
 
     if args.data_root_path is None:
         args.data_root_path = datasets_path[args.dataset]['data_root_path']

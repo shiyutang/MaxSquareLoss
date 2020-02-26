@@ -44,8 +44,8 @@ class Eval():
 
     def Mean_Intersection_over_Union(self, out_16_13=False):
         MIoU = np.diag(self.confusion_matrix) / (
-                    np.sum(self.confusion_matrix, axis=1) + np.sum(self.confusion_matrix, axis=0) -
-                    np.diag(self.confusion_matrix))
+                np.sum(self.confusion_matrix, axis=1) + np.sum(self.confusion_matrix, axis=0) -
+                np.diag(self.confusion_matrix))
         if self.synthia:
             MIoU_16 = np.nanmean(MIoU[:self.ignore_index])
             MIoU_13 = np.nanmean(MIoU[synthia_set_16_to_13])
@@ -54,9 +54,15 @@ class Eval():
             MIoU_16 = np.nanmean(MIoU[synthia_set_16])
             MIoU_13 = np.nanmean(MIoU[synthia_set_13])
             return MIoU_16, MIoU_13
+        IOUs = {}
+        for i,element in enumerate(MIoU):
+            IOUs[name_classes[i]] = element
+
+        # print('MIoU,IOUS',MIoU,IOUs)
+
         MIoU = np.nanmean(MIoU[:self.ignore_index]) # compute mean ignore NAN
 
-        return MIoU
+        return MIoU,IOUs
 
     def Frequency_Weighted_Intersection_over_Union(self, out_16_13=False):
         FWIoU = np.multiply(np.sum(self.confusion_matrix, axis=1), np.diag(self.confusion_matrix))

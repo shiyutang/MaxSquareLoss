@@ -24,37 +24,56 @@ class UDATrainer(Trainer):
         self.styles_source = styles_source
         self.styles_target = styles_target
         ## source train loader
+        if 'GTA5' in self.styles_source[0]:
+            print('build source_train',self.styles_source)
+            source_trans_data_set_train = GTA5_Dataset(args,
+                                   data_root_path=self.datasets_path[self.styles_source[0]]['data_root_path'],
+                                   list_path=self.datasets_path[self.styles_source[0]]['list_path'],
+                                   gt_path=self.datasets_path[self.styles_source[0]]['gt_path'],
+                                   split='train',
+                                   base_size=args.base_size,
+                                   crop_size=args.crop_size)
 
-        source_trans_data_set = GTA5_Dataset(args,
-                               data_root_path=self.datasets_path[self.styles_source[0]]['data_root_path'],
-                               list_path=self.datasets_path[self.styles_source[0]]['list_path'],
-                               gt_path=self.datasets_path[self.styles_source[0]]['gt_path'],
-                               split='train',
-                               base_size=args.base_size,
-                               crop_size=args.crop_size)
+            ## source validation loader
+            source_trans_data_set_val = GTA5_Dataset(args,
+                                           data_root_path=self.datasets_path[self.styles_source[0]]['data_root_path'],
+                                           list_path=self.datasets_path[self.styles_source[0]]['list_path'],
+                                           gt_path=self.datasets_path[self.styles_source[0]]['gt_path'],
+                                           split='test',
+                                           base_size=args.base_size,
+                                           crop_size=args.crop_size)
+
+        elif 'SYNTHIA' in self.styles_source[0]:
+            source_trans_data_set_train = SYNTHIA_Dataset(args,
+                                   data_root_path=self.datasets_path[self.styles_source[0]]['data_root_path'],
+                                   list_path=self.datasets_path[self.styles_source[0]]['list_path'],
+                                   split='train',
+                                   base_size=args.base_size,
+                                   crop_size=args.crop_size)
+
+
+            ## source validation loader
+            source_trans_data_set_val = SYNTHIA_Dataset(args,
+                                           data_root_path=self.datasets_path[self.styles_source[0]]['data_root_path'],
+                                           list_path=self.datasets_path[self.styles_source[0]]['list_path'],
+                                           split='val',
+                                           base_size=args.base_size,
+                                           crop_size=args.crop_size)
+
         self.source_trans_dataloader = \
-            data.DataLoader(source_trans_data_set,
+            data.DataLoader(source_trans_data_set_train,
                            batch_size=self.args.batch_size,
                            shuffle=True,
                            num_workers=self.args.data_loader_workers,
                            pin_memory=self.args.pin_memory,
                            drop_last=True)
 
-        ## source validation loader
-        source_trans_data_set = GTA5_Dataset(args,
-                                       data_root_path=self.datasets_path[self.styles_source[0]]['data_root_path'],
-                                       list_path=self.datasets_path[self.styles_source[0]]['list_path'],
-                                       gt_path=self.datasets_path[self.styles_source[0]]['gt_path'],
-                                       split='val',
-                                       base_size=args.base_size,
-                                       crop_size=args.crop_size)
-        self.source_trans_val_dataloader = data.DataLoader(source_trans_data_set,
+        self.source_trans_val_dataloader = data.DataLoader(source_trans_data_set_val,
                                                            batch_size=self.args.batch_size,
                                                            shuffle=False,
                                                            num_workers=self.args.data_loader_workers,
                                                            pin_memory=self.args.pin_memory,
                                                            drop_last=True)
-
         ## target dataset train and validation
         target_trans_data_set =\
             City_Dataset(args,
@@ -356,7 +375,10 @@ if __name__ == '__main__':
     #     elif "Cityscapes_" in str(f):
     #         styles_target.append(f.stem)
 
-    styles_source=['GTA5_ambulance_gta5pcity_retrain_alpha1stylewt1']
+    # styles_source=['GTA5_cityscapes_standard']
+    # styles_target = ['cityscapes']
+
+    styles_source = ['GTA5_ambulance_gta5pcity_retrain_alpha1stylewt1']
     styles_target = ['Cityscapes_ambulance_gta5pcity_retrain_alpha1stylewt1']
 
     # logger.info("styles_souce,style_target", styles_source, styles_target)

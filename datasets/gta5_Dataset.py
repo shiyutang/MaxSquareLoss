@@ -61,7 +61,8 @@ class GTA5_Dataset(City_Dataset):
         print("{} num images in GTA5 {} set have been loaded.".format(len(self.items), self.split))
 
     def __getitem__(self, item):
-        id = int(self.items[item][-9:-4])
+        # id = int(self.items[item][-9:-4])
+        id = int(self.items[item])
 
         image_path = os.path.join(self.image_filepath, "{:0>5d}.png".format(id))
         image = Image.open(image_path).convert("RGB")
@@ -74,7 +75,7 @@ class GTA5_Dataset(City_Dataset):
         else:
             image, gt_image = self._val_sync_transform(image, gt_image)
 
-        return image, gt_image, item
+        return image, gt_image, str(id)
 
 class GTA5_DataLoader():
     def __init__(self, args, training=True,datasets_path=None):
