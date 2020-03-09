@@ -14,13 +14,6 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 IMG_MEAN = np.array((104.00698793, 116.66876762, 122.67891434), dtype=np.float32)
 NUM_CLASSES = 19
 
-def style_transform():
-    transform_list = [
-        ttransforms.Resize(size=(512, 1024)),
-        # transforms.RandomCrop(256),
-        ttransforms.ToTensor()
-    ]
-    return ttransforms.Compose(transform_list)
 
 
 # colour map
@@ -113,8 +106,6 @@ class City_Dataset(data.Dataset):
         self.trainid_to_13id = {id:i for i,id in enumerate(synthia_set_13)}
         
         # print("{} num images in Cityscapes {} set have been loaded.".format(len(self.items), self.split))
-        # if self.args.numpy_transform:
-        #     print("use numpy_transform, instead of tensor transform!")
 
     def id2trainId(self, label, reverse=False, ignore_label=-1):
         label_copy = ignore_label * np.ones(label.shape, dtype=np.float32)
@@ -134,26 +125,15 @@ class City_Dataset(data.Dataset):
 
     def __getitem__(self, item):
         id = self.items[item]
-        # filename = id.split("train_")[-1].split("val_")[-1].split("test_")[-1]
-        # image_filepath = os.path.join(self.image_filepath, id.split("_")[0], id.split("_")[1])
-        # image_filename = filename + "_leftImg8bit.png"
-        # image_path = os.path.join(image_filepath, image_filename)
-        # print("self.data_path,id",self.data_path,id)
         image_path = os.path.join(self.data_path,id)
         image = Image.open(image_path).convert("RGB")
 
-        # print("self.gt_path",self.gt_path)
         gt_image_path = self.gt_path+id.replace("leftImg8bit","",1)\
                                      .replace("leftImg8bit","gtFine_labelIds")
-        # print("gt_image_path",gt_image_path)
         gt_image = Image.open(gt_image_path)
 
         if 'style' in self.split:
-            image_tf = style_transform()(image)
-            if ("train" in self.split or "trainval" in self.split) and self.training:
-                _, gt_image = self._train_sync_transform(image, gt_image)
-            else:
-                _, gt_image = self._val_sync_transform(image, gt_image)
+            image_tf = self.adain_transform()(image)
         else:
             if ("train" in self.split or "trainval" in self.split) and self.training:
                 image_tf, gt_image = self._train_sync_transform(image, gt_image)
@@ -275,6 +255,15 @@ class City_Dataset(data.Dataset):
         target = torch.from_numpy(target)
 
         return target
+
+    def adain_transform(self):
+        from torchvision import transforms
+        transform_list = [
+            transforms.Resize(size=self.base_size),  # (h,w)
+            transforms.RandomCrop(self.crop_size),
+            transforms.ToTensor()
+        ]
+        return transforms.Compose(transform_list)
 
     def __len__(self):
         return len(self.items)

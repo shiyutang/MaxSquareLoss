@@ -12,6 +12,7 @@ from datasets.gta5_Dataset import GTA5_DataLoader, GTA5_Dataset
 from datasets.synthia_Dataset import SYNTHIA_Dataset
 
 from tools.train_source import *
+import torch.optim.lr_scheduler as scheduler
 
 
 class UDATrainer(Trainer):
@@ -24,38 +25,58 @@ class UDATrainer(Trainer):
         self.styles_source = styles_source
         self.styles_target = styles_target
         ## source train loader
+        if 'GTA5' in self.styles_source[0]:
+            print('build source_train',self.styles_source)
+            source_trans_data_set_train = GTA5_Dataset(args,
+                                   data_root_path=self.datasets_path[self.styles_source[0]]['data_root_path'],
+                                   list_path=self.datasets_path[self.styles_source[0]]['list_path'],
+                                   gt_path=self.datasets_path[self.styles_source[0]]['gt_path'],
+                                   split='train',
+                                   base_size=args.base_size,
+                                   crop_size=args.crop_size)
 
-        source_trans_data_set = GTA5_Dataset(args,
-                               data_root_path=self.datasets_path[self.styles_source[0]]['data_root_path'],
-                               list_path=self.datasets_path[self.styles_source[0]]['list_path'],
-                               gt_path=self.datasets_path[self.styles_source[0]]['gt_path'],
-                               split='train',
-                               base_size=args.base_size,
-                               crop_size=args.crop_size)
+            ## source validation loader
+            source_trans_data_set_val = GTA5_Dataset(args,
+                                           data_root_path=self.datasets_path[self.styles_source[0]]['data_root_path'],
+                                           list_path=self.datasets_path[self.styles_source[0]]['list_path'],
+                                           gt_path=self.datasets_path[self.styles_source[0]]['gt_path'],
+                                           split='test',
+                                           base_size=args.base_size,
+                                           crop_size=args.crop_size)
+
+        elif 'SYNTHIA' in self.styles_source[0]:
+            source_trans_data_set_train = SYNTHIA_Dataset(args,
+                                   data_root_path=self.datasets_path[self.styles_source[0]]['data_root_path'],
+                                   list_path=self.datasets_path[self.styles_source[0]]['list_path'],
+                                   split='train',
+                                   base_size=args.base_size,
+                                   crop_size=args.crop_size)
+
+
+            ## source validation loader
+            source_trans_data_set_val = SYNTHIA_Dataset(args,
+                                           data_root_path=self.datasets_path[self.styles_source[0]]['data_root_path'],
+                                           list_path=self.datasets_path[self.styles_source[0]]['list_path'],
+                                           split='val',
+                                           base_size=args.base_size,
+                                           crop_size=args.crop_size)
+
         self.source_trans_dataloader = \
-            data.DataLoader(source_trans_data_set,
+            data.DataLoader(source_trans_data_set_train,
                            batch_size=self.args.batch_size,
                            shuffle=True,
                            num_workers=self.args.data_loader_workers,
                            pin_memory=self.args.pin_memory,
                            drop_last=True)
 
-        ## source validation loader
-        source_trans_data_set = GTA5_Dataset(args,
-                                       data_root_path=self.datasets_path[self.styles_source[0]]['data_root_path'],
-                                       list_path=self.datasets_path[self.styles_source[0]]['list_path'],
-                                       gt_path=self.datasets_path[self.styles_source[0]]['gt_path'],
-                                       split='val',
-                                       base_size=args.base_size,
-                                       crop_size=args.crop_size)
-        self.source_trans_val_dataloader = data.DataLoader(source_trans_data_set,
+        self.source_trans_val_dataloader = data.DataLoader(source_trans_data_set_val,
                                                            batch_size=self.args.batch_size,
                                                            shuffle=False,
                                                            num_workers=self.args.data_loader_workers,
                                                            pin_memory=self.args.pin_memory,
                                                            drop_last=True)
-
         ## target dataset train and validation
+        print('build target_train', self.styles_target[0])
         target_trans_data_set =\
             City_Dataset(args,
                        data_root_path=self.datasets_path[self.styles_target[0]]['data_root_path'],
@@ -109,17 +130,7 @@ class UDATrainer(Trainer):
         self.round_num = self.args.round_num
 
         self.target_loss.to(self.device)
-
         self.target_hard_loss = nn.CrossEntropyLoss(ignore_index=-1)
-
-    def save_shuffled_list(self):
-        with open(os.path.join(self.datasets_path[self.styles_source[0]]['list_path'], "train.txt"), "r") as f:
-            content = f.readlines()
-            random.shuffle(content)
-
-        with open(os.path.join(self.datasets_path[self.styles_source[0]]['list_path'], "train.txt"), "w+") as f:
-            for line in content:
-                f.write(line)
 
     def train_target(self, pred):
         if isinstance(pred, tuple):
@@ -181,10 +192,6 @@ class UDATrainer(Trainer):
         self.loss_seg_value += self.loss_val.cpu().item() / self.iter_num
 
     def main(self):
-        # display args details
-        self.logger.info("Global configuration as follows:")
-        for key, val in vars(self.args).items():
-            self.logger.info("{:16} {}".format(key, val))
 
         # load pretrained checkpoint
         if self.args.checkpoint_dir is not None:
@@ -211,8 +218,6 @@ class UDATrainer(Trainer):
         self.writer.close()
 
     def train_round(self):
-        if "target_aug" in self.args.exp_tag:
-            self.logger.info("#########target_aug_begin##############")
         for r in range(self.current_round, self.round_num):
             print("\n############## Begin {}/{} Round! #################\n".format(self.current_round + 1,
                                                                                    self.round_num))
@@ -222,7 +227,6 @@ class UDATrainer(Trainer):
 
             # generate threshold
             self.threshold = self.args.threshold
-            print("self.epoch_num", self.epoch_num)
             self.train()  ## it was using the method in the trainer
 
             self.current_round += 1
@@ -232,7 +236,7 @@ class UDATrainer(Trainer):
 
         tqdm_epoch = tqdm(zip(self.source_trans_dataloader, self.target_trans_dataloader),
                           total=self.dataloader.num_iterations,
-                          desc="Train Round-{}-Epoch-{}-total-{}".\
+                          desc="Train Round-{}-Epoch-{}-total-{}". \
                           format(self.current_round,self.current_epoch + 1, self.epoch_num))
         self.logger.info("Training one epoch... in the method defined by solve_gta5")
         self.Eval.reset()
@@ -251,9 +255,6 @@ class UDATrainer(Trainer):
             self.logger.info("freeze batch normalization successfully!")
         else:
             self.model.train()
-
-        batch_idx = 0  # iter in the data
-
 
         for batch_s, batch_t in tqdm_epoch:
             self.poly_lr_scheduler(optimizer=self.optimizer, init_lr=self.args.lr)
@@ -282,8 +283,6 @@ class UDATrainer(Trainer):
 
             self.optimizer.step()
             self.optimizer.zero_grad()
-
-            batch_idx += 1
 
             self.current_iter += 1
 
@@ -349,17 +348,10 @@ if __name__ == '__main__':
     args.target_dataset = args.dataset
 
     train_id = str(args.source_dataset) + "2" + str(args.target_dataset) + "_" + args.target_mode
-    styles_source, styles_target = [], []
-    for f in Path("/data/Projects/ADVENT/data").glob("*"):
-        if "GTA5_" in str(f):
-            styles_source.append(f.stem)
-        elif "Cityscapes_" in str(f):
-            styles_target.append(f.stem)
 
-    styles_source=['GTA5_ambulance_styleRetrain']
-    styles_target = ['Cityscapes_ambulance_styleRetrain']
 
-    logger.info("styles_souce,style_target", styles_source, styles_target)
+    styles_source = ['GTA5_ambulance_gta5pcity_retrain_alpha1stylewt1']
+    styles_target = ['Cityscapes_ambulance_gta5pcity_retrain_alpha1stylewt1']
 
     agent = UDATrainer(args=args, cuda=True, train_id=train_id,
                        logger=logger, datasets_path=datasets_path,

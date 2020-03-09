@@ -5,7 +5,6 @@ import os
 import torch
 import torch.utils.data as data
 from pathlib import Path
-from torchvision import transforms
 
 from datasets.cityscapes_Dataset import City_Dataset, City_DataLoader
 
@@ -30,14 +29,6 @@ class FlatFolderDataset(data.Dataset):
     def name(self):
         return 'FlatFolderDataset'
 
-
-def train_transform():
-    transform_list = [
-        transforms.Resize(size=(512, 1024)), # (h,w)
-        # transforms.RandomCrop(256),
-        transforms.ToTensor()
-    ]
-    return transforms.Compose(transform_list)
 
 
 class GTA5_Dataset(City_Dataset):
@@ -70,7 +61,7 @@ class GTA5_Dataset(City_Dataset):
         if 'train' in self.split:
             item_list_filepath = os.path.join(self.list_path, 'train'+".txt")
         elif "val" in self.split:
-            item_list_filepath = os.path.join(self.list_path, 'val'+".txt")
+            item_list_filepath = os.path.join(self.list_path, 'test'+".txt")
 
 
         if not os.path.exists(item_list_filepath):
@@ -101,11 +92,7 @@ class GTA5_Dataset(City_Dataset):
         gt_image = Image.open(gt_image_path)
 
         if 'style' in self.split:
-            image_tf = train_transform()(image)
-            if ("train" in self.split or "trainval" in self.split) and self.training:
-                _, gt_image = self._train_sync_transform(image, gt_image)
-            else:
-                _, gt_image = self._val_sync_transform(image, gt_image)
+            image_tf = self.adain_transform()(image)
         else:
             if ("train" in self.split or "trainval" in self.split) and self.training:
                 image_tf, gt_image = self._train_sync_transform(image, gt_image)
@@ -113,7 +100,7 @@ class GTA5_Dataset(City_Dataset):
                 image_tf, gt_image = self._val_sync_transform(image, gt_image)
 
 
-        return image_tf, gt_image, item
+        return image_tf, gt_image, id
 
 class GTA5_DataLoader():
     def __init__(self, args, training=True,datasets_path=None):

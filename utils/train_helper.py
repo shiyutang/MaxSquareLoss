@@ -137,7 +137,7 @@ class Net(nn.Module):
         self.enc_4 = nn.Sequential(*enc_layers[18:31])  # relu3_1 -> relu4_1
         self.encoder = nn.Sequential(*list(vgg.children())[:31])
         decoder.load_state_dict(
-                torch.load('/data/Projects/pytorch-AdaIN/experiments/decoder_iter_160000.pth.tar'))
+                torch.load('/data/Projects/pytorch-AdaIN/experiments/gta5pcity_ambulance_alpha1wts1/decoder_iter_160000.pth.tar'))
                 # torch.load("/data/Projects/pytorch-AdaIN/models/decoder.pth"))
         self.decoder = decoder
         self.mse_loss = nn.MSELoss()
@@ -176,7 +176,7 @@ class Net(nn.Module):
 
     def test(self,content,batch_style,save_path,alpha=1.0,
              weights=(1,1,1,1)):
-        assert (0.0<=alpha<=1.0) #todo super parameter
+        assert (0.0<=alpha<=1.0)
         # print('start producing test images')
         interpolation_weights = [i / sum(weights) for i in weights]
         style = torch.stack(list(batch_style))

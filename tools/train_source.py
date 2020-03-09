@@ -12,7 +12,6 @@ import numpy as np
 from distutils.version import LooseVersion
 from tensorboardX import SummaryWriter
 from torchvision import  transforms
-from torchvision import  transforms
 
 import sys
 import random
@@ -52,11 +51,12 @@ datasets_path={
                    'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
     'gta5': {'data_root_path': '/data/Projects/ADVENT/data/GTA5',
              'list_path': '/data/Projects/ADVENT/data/GTA5',
-                    'image_path':'/data/Projects/ADVENT/data/GTA5/images',
-                    'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
-    'GTA5_accordion': {'data_root_path': '/data/Projects/ADVENT/data/GTA5_accordion', 'list_path': '/data/Projects/ADVENT/data/GTA5',
-                    'image_path':'/data/Projects/ADVENT/data/GTA5_accordion/images',
-                    'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
+             'image_path':'/data/Projects/ADVENT/data/GTA5/images',
+             'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
+    'GTA5_accordion': {'data_root_path': '/data/Projects/ADVENT/data/GTA5_accordion',
+                       'list_path': '/data/Projects/ADVENT/data/GTA5',
+                       'image_path':'/data/Projects/ADVENT/data/GTA5_accordion/images',
+                       'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
     'GTA5_ambulance_styleRetrain': {'data_root_path': '/data/Projects/ADVENT/data/GTA5_ambulance_styleRetrain',
                         'list_path': '/data/Projects/ADVENT/data/GTA5',
                        'image_path': '/data/Projects/ADVENT/data/GTA5_ambulance_styleRetrain/images',
@@ -94,7 +94,7 @@ class Trainer():
         self.args = args
         self.datasets_path = datasets_path
         if torch.cuda.device_count()==1:
-            os.environ["CUDA_VISIBLE_DEVICES"] = self.args.gpu
+            os.environ["CUDA_VISIBLE_DEVICES"] = self.args.gpu # else 0,1,2,3
         self.cuda = cuda and torch.cuda.is_available()
         self.device = torch.device('cuda' if self.cuda else 'cpu')
         self.train_id = train_id
@@ -103,6 +103,7 @@ class Trainer():
 
         self.current_MIoU = 0
         self.best_MIou = 0
+        self.best_FWIou=0
         self.best_source_MIou = 0
         self.current_epoch = 0
         self.current_iter = 0
@@ -155,9 +156,9 @@ class Trainer():
 
     def main(self):
         # display args details
-        self.logger.info("Global configuration as follows:")
-        for key, val in vars(self.args).items():
-            self.logger.info("{:16} {}".format(key, val))
+        # self.logger.info("Global configuration as follows:")
+        # for key, val in vars(self.args).items():
+        #     self.logger.info("{:16} {}".format(key, val))
 
 
         # load pretrained checkpoint
@@ -344,17 +345,15 @@ class Trainer():
                               desc="Val Epoch-{}-".format(self.current_epoch + 1))
             if mode == 'val':
                 self.model.eval()
-
             for x, y, id in tqdm_batch:
                 x = self.network(x,self.batch_style)
 
 
-                x, _ = self.target_data_set._val_sync_transform(self.result_tran(x), None)
+                x, y = self.target_dataset_val._val_sync_transform(self.result_tran(x), y)
                 x = x.unsqueeze(0)
 
                 if self.cuda:
                     x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
-
                 # model
                 pred = self.model(x)                   
                 if isinstance(pred, tuple):
@@ -364,13 +363,11 @@ class Trainer():
                     pred_P_2 = F.softmax(pred_2, dim=1)
                 y = torch.squeeze(y, 1)
 
-
                 pred = pred.data.cpu().numpy()
                 label = y.cpu().numpy()
                 argpred = np.argmax(pred, axis=1)
 
                 self.Eval.add_batch(label, argpred)
-                
 
             #show val result on tensorboard
             images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images, numpy_transform=self.args.numpy_transform)
@@ -435,7 +432,7 @@ class Trainer():
             for x, y, id in tqdm_batch:
                 x = self.network(x,self.batch_style)
 
-                x, _ = self.source_dataset._val_sync_transform(self.result_tran(x), None)
+                x, y = self.source_dataset._val_sync_transform(self.result_tran(x), y)
                 x = x.unsqueeze(0)
                 # y.to(torch.long)
                 if self.cuda:
@@ -448,7 +445,6 @@ class Trainer():
                     pred = pred[0]
                     pred_P = F.softmax(pred, dim=1)
                     pred_P_2 = F.softmax(pred_2, dim=1)
-
                 y = torch.squeeze(y, 1)
                 pred = pred.data.cpu().numpy()
                 label = y.cpu().numpy()
@@ -574,6 +570,12 @@ class Trainer():
         if len(optimizer.param_groups) == 3:
             optimizer.param_groups[2]["lr"] = new_lr
 
+    def adain_lr_scheduler(self, optimizer, iteration_count):
+        """Imitating the original implementation"""
+        lr = args.lr / (1.0 + 5e-5 * iteration_count)
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = lr
+
 
 def add_train_args(arg_parser):
     # Path related arguments
@@ -607,8 +609,6 @@ def add_train_args(arg_parser):
                             help='random seed')
     arg_parser.add_argument('--gpu', type=str, default="0",
                             help=" the num of gpu")
-    # arg_parser.add_argument('--batch_size_per_gpu', default=1, type=int,
-    #                         help='input batch size per gpu')
     arg_parser.add_argument("--batch_size",default=1,type=int,
                             help="directly set batch size")
     arg_parser.add_argument("--exp_tag",type=str,default="test",
@@ -617,13 +617,13 @@ def add_train_args(arg_parser):
     # dataset related arguments
     arg_parser.add_argument('--dataset', default='cityscapes', type=str,
                             help='dataset choice')
-    arg_parser.add_argument('--base_size', default="1280,720", type=str, # for random crop
+    arg_parser.add_argument('--base_size', default="1280,640", type=str, # for random crop
                             help='crop size of image')
-    arg_parser.add_argument('--crop_size', default="1280,720", type=str,
+    arg_parser.add_argument('--crop_size', default="1280,640", type=str,
                             help='base size of image')
-    arg_parser.add_argument('--target_base_size', default="1280,720", type=str, # for random crop
+    arg_parser.add_argument('--target_base_size', default="1280,640", type=str, # for random crop
                             help='crop size of target image')
-    arg_parser.add_argument('--target_crop_size', default="1280,720", type=str,
+    arg_parser.add_argument('--target_crop_size', default="1280,640", type=str,
                             help='base size of target image')
     arg_parser.add_argument('--num_classes', default=19, type=int,
                             help='num class of mask')
@@ -639,10 +639,11 @@ def add_train_args(arg_parser):
                         help='add random_crop')
     arg_parser.add_argument('--resize', default=True, type=str2bool,
                         help='resize')
-    arg_parser.add_argument('--gaussian_blur', default=False, type=str2bool,
+    arg_parser.add_argument('--gaussian_blur', default=True, type=str2bool,
                         help='add gaussian_blur')
     arg_parser.add_argument('--numpy_transform', default=True, type=str2bool,
-                        help='image transform with numpy style')
+                        help='image transform with numpy style, '
+                             'transform pic as image from 0-255，rather than tensor from 0-1')
 
     # optimization related arguments
 
@@ -671,8 +672,8 @@ def add_train_args(arg_parser):
     return arg_parser
 
 def init_args(args):
-    if torch.cuda.device_count()==1:
-        args.batch_size = 1
+    # if torch.cuda.device_count()==1:
+    #     args.batch_size = 1
 
     print("batch size: ", args.batch_size)
 
@@ -697,13 +698,6 @@ def init_args(args):
     else:
         args.target_crop_size = (int(target_crop_size[0]), int(target_crop_size[1]))
         args.target_base_size = (int(target_base_size[0]), int(target_base_size[1]))
-
-    # if not args.continue_training:
-        # if os.path.exists(args.checkpoint_dir):
-        #     print("checkpoint dir exists, which will be removed")
-        #     import shutil
-        #     shutil.rmtree(args.checkpoint_dir, ignore_errors=True)
-        # os.mkdir(args.checkpoint_dir)
 
     if args.data_root_path is None:
         args.data_root_path = datasets_path[args.dataset]['data_root_path']
