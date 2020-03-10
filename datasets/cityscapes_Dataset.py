@@ -132,13 +132,11 @@ class City_Dataset(data.Dataset):
                                      .replace("leftImg8bit","gtFine_labelIds")
         gt_image = Image.open(gt_image_path)
 
-        if 'style' in self.split:
-            image_tf = self.adain_transform()(image)
+
+        if ("train" in self.split or "trainval" in self.split) and self.training:
+            image_tf, gt_image = self._train_sync_transform(image, gt_image)
         else:
-            if ("train" in self.split or "trainval" in self.split) and self.training:
-                image_tf, gt_image = self._train_sync_transform(image, gt_image)
-            else:
-                image_tf, gt_image = self._val_sync_transform(image, gt_image)
+            image_tf, gt_image = self._val_sync_transform(image, gt_image)
 
 
         return image_tf, gt_image, item
@@ -154,76 +152,23 @@ class City_Dataset(data.Dataset):
             if random.random() < 0.5:
                 img = img.transpose(Image.FLIP_LEFT_RIGHT)
                 if mask: mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
-            crop_w, crop_h = self.crop_size
 
-        if self.random_crop:
-            # random scale
-            base_w , base_h = self.base_size
-            w, h = img.size
-            assert w >= h
-            if (base_w / w) > (base_h / h):
-                base_size = base_w 
-                short_size = random.randint(int(base_size * 0.5), int(base_size * 2.0))
-                ow = short_size
-                oh = int(1.0 * h * ow / w)
-            else:
-                base_size = base_h
-                short_size = random.randint(int(base_size * 0.5), int(base_size * 2.0))
-                oh = short_size
-                ow = int(1.0 * w * oh / h)
-
-            img = img.resize((ow, oh), Image.BICUBIC)
-            if mask: mask = mask.resize((ow, oh), Image.NEAREST)
-            # pad crop
-            if ow < crop_w or oh < crop_h:
-                padh = crop_h - oh if oh < crop_h else 0
-                padw = crop_w - ow if ow < crop_w else 0
-                img = ImageOps.expand(img, border=(0, 0, padw, padh), fill=0)
-                if mask: mask = ImageOps.expand(mask, border=(0, 0, padw, padh), fill=0)
-            # random crop crop_size
-            w, h = img.size
-            x1 = random.randint(0, w - crop_w)
-            y1 = random.randint(0, h - crop_h)
-            img = img.crop((x1, y1, x1 + crop_w, y1 + crop_h))
-            if mask: mask = mask.crop((x1, y1, x1 + crop_w, y1 + crop_h))
-        elif self.resize:
+        if self.resize:
             img = img.resize(self.crop_size, Image.BICUBIC)
             if mask: mask = mask.resize(self.crop_size, Image.NEAREST)
 
-        if self.gaussian_blur:
-            # gaussian blur as in PSP
-            if random.random() < 0.5:
-                img = img.filter(ImageFilter.GaussianBlur(
-                    radius=random.random()))
-
         # final transform
         if mask: 
-            img =  self._img_transform(img)
-            mask =self._mask_transform(mask)
+            img  =  self._img_transform(img)
+            mask = self._mask_transform(mask)
             return img, mask
         else:
             img = self._img_transform(img)
             return img
 
+
     def _val_sync_transform(self, img, mask):
-        if self.random_crop:
-            crop_w, crop_h = self.crop_size
-            w, h = img.size
-            if crop_w / w < crop_h / h:
-                oh = crop_h
-                ow = int(1.0 * w * oh / h)
-            else:
-                ow = crop_w
-                oh = int(1.0 * h * ow / w)
-            img = img.resize((ow, oh), Image.BICUBIC)
-            mask = mask.resize((ow, oh), Image.NEAREST)
-            # center crop
-            w, h = img.size
-            x1 = int(round((w - crop_w) / 2.))
-            y1 = int(round((h - crop_h) / 2.))
-            img = img.crop((x1, y1, x1 + crop_w, y1 + crop_h))
-            mask = mask.crop((x1, y1, x1 + crop_w, y1 + crop_h))
-        elif self.resize:
+        if self.resize:
             img = img.resize(self.crop_size, Image.BICUBIC)
             if mask:
                 mask = mask.resize(self.crop_size, Image.NEAREST)
@@ -232,7 +177,9 @@ class City_Dataset(data.Dataset):
         img = self._img_transform(img)
         if mask:
             mask = self._mask_transform(mask)
-        return img, mask
+            return img,mask
+        else:
+            return img
 
     def _img_transform(self, image):
         if self.args.numpy_transform:
@@ -258,9 +205,11 @@ class City_Dataset(data.Dataset):
 
     def adain_transform(self):
         from torchvision import transforms
+        base_size = (self.base_size[1],self.base_size[0])
+        crop_size = (self.crop_size[1],self.crop_size[0])
         transform_list = [
-            transforms.Resize(size=self.base_size),  # (h,w)
-            transforms.RandomCrop(self.crop_size),
+            transforms.Resize(size=base_size),  # (h,w) 512, 1024
+            transforms.RandomCrop(crop_size),
             transforms.ToTensor()
         ]
         return transforms.Compose(transform_list)
@@ -340,7 +289,7 @@ def inv_preprocess(imgs, num_images=1, img_mean=IMG_MEAN, numpy_transform=False)
     """
     if numpy_transform:
         imgs = flip(imgs, 1)
-    def norm_ip(img, min, max):
+    def norm_ip(img, min, max):  ## 图像归一化
         img.clamp_(min=min, max=max)
         img.add_(-min).div_(max - min + 1e-5)
     norm_ip(imgs, float(imgs.min()), float(imgs.max()))

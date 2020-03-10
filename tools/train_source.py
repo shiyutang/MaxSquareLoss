@@ -37,18 +37,26 @@ datasets_path={
                    'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
                    'image_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_styleRetrain/leftImg8bit',
                    'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
-    'Cityscapes_church': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_church',
+    'Cityscapes_ambulance_retrain_alpha0p5wts10':
+        {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_retrain_alpha0p5wts10',
                    'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
-                   'image_path': '/data/Projects/ADVENT/data/Cityscapes_church/leftImg8bit',
+                   'image_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_retrain_alpha0p5wts10/leftImg8bit',
                    'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
-    'Cityscapes_elephant': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_elephant',
-                   'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
-                   'image_path': '/data/Projects/ADVENT/data/Cityscapes_elephant/leftImg8bit',
-                   'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
-    'Cityscapes_prunus_mume': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_prunus_mume',
-                   'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
-                   'image_path': '/data/Projects/ADVENT/data/Cityscapes_prunus_mume/leftImg8bit',
-                   'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
+    'Cityscapes_ambulance_retrain_alpha1stylewt5':
+        {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_retrain_alpha1stylewt5',
+         'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
+         'image_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_retrain_alpha1stylewt5/leftImg8bit',
+         'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
+    'Cityscapes_ambulance_gta5pcity_retrain_alpha1stylewt1':
+        {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_gta5pcity_retrain_alpha1stylewt1',
+         'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
+         'image_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_gta5pcity_retrain_alpha1stylewt1/leftImg8bit',
+         'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
+    'Cityscapes_cityscapes_standard':
+        {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_cityscapes_standard',
+         'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
+         'image_path': '/data/Projects/ADVENT/data/Cityscapes_cityscapes_standard/leftImg8bit',
+         'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
     'gta5': {'data_root_path': '/data/Projects/ADVENT/data/GTA5',
              'list_path': '/data/Projects/ADVENT/data/GTA5',
              'image_path':'/data/Projects/ADVENT/data/GTA5/images',
@@ -69,10 +77,22 @@ datasets_path={
                        'list_path': '/data/Projects/ADVENT/data/GTA5',
                        'image_path': '/data/Projects/ADVENT/data/GTA5_elephant/images',
                        'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
-    'GTA5_prunus_mume': {'data_root_path': '/data/Projects/ADVENT/data/GTA5_prunus_mume',
-                       'list_path': '/data/Projects/ADVENT/data/GTA5',
-                       'image_path': '/data/Projects/ADVENT/data/GTA5_prunus_mume/images',
-                       'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
+    'GTA5_ambulance_gta5pcity_retrain_alpha1stylewt1':
+        {'data_root_path': '/data/Projects/ADVENT/data/GTA5_ambulance_gta5pcity_retrain_alpha1stylewt1',
+         'list_path': '/data/Projects/ADVENT/data/GTA5',
+         'image_path': '/data/Projects/ADVENT/data/GTA5_ambulance_gta5pcity_retrain_alpha1stylewt1/images',
+         'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
+    'GTA5_ambulance_gta5pcity_retrain_alpha1stylewt0p5':
+        {'data_root_path': '/data/Projects/ADVENT/data/GTA5_ambulance_gta5pcity_retrain_alpha1stylewt0p5',
+         'list_path': '/data/Projects/ADVENT/data/GTA5',
+         'image_path': '/data/Projects/ADVENT/data/GTA5_ambulance_gta5pcity_retrain_alpha1stylewt0p5/images',
+         'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
+    'GTA5_cityscapes_standard':
+        {'data_root_path': '/data/Projects/ADVENT/data/GTA5_cityscapes_standard',
+         'list_path': '/data/Projects/ADVENT/data/GTA5',
+         'image_path': '/data/Projects/ADVENT/data/GTA5_cityscapes_standard/images',
+         'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
+
     'synthia': {'data_root_path': '/data/Projects/ADVENT/data/SYNTHIA', 'list_path': '/data/Projects/ADVENT/data/SYNTHIA/list',
                     'image_path':'/data/Projects/ADVENT/data/SYNTHIA/RGB',
                     'gt_path': '/data/Projects/ADVENT/data/GT/LABELS'},
@@ -346,11 +366,10 @@ class Trainer():
             if mode == 'val':
                 self.model.eval()
             for x, y, id in tqdm_batch:
-                x = self.network(x,self.batch_style)
-
-
-                x, y = self.target_dataset_val._val_sync_transform(self.result_tran(x), y)
-                x = x.unsqueeze(0)
+                _,_,x = self.network(x,self.batch_style)
+                x = x.mul_(255).add_(0.5).clamp_(0, 255).div_(255) ## 1，3 512，1024
+                # print('validate,x.shape',x.shape)
+                # x = x.unsqueeze(0)
 
                 if self.cuda:
                     x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
@@ -359,8 +378,6 @@ class Trainer():
                 if isinstance(pred, tuple):
                     pred_2 = pred[1]
                     pred = pred[0]
-                    pred_P = F.softmax(pred, dim=1)
-                    pred_P_2 = F.softmax(pred_2, dim=1)
                 y = torch.squeeze(y, 1)
 
                 pred = pred.data.cpu().numpy()
@@ -425,16 +442,16 @@ class Trainer():
         self.logger.info('\nvalidating source domain...')
         self.Eval.reset()
         with torch.no_grad():
-            tqdm_batch = tqdm(self.source_val_dataloader, total=self.dataloader.valid_iterations,
+            tqdm_batch = tqdm(self.source_dataloader_val, total=self.dataloader.valid_iterations,
                               desc="Source Val Epoch-{}-".format(self.current_epoch + 1))
             self.model.eval()
             i = 0
             for x, y, id in tqdm_batch:
-                x = self.network(x,self.batch_style)
+                _,_,x = self.network(x,self.batch_style)
+                x = x.mul_(255).add_(0.5).clamp_(0, 255).div_(255) # 1，3，512，1024
+                # print('source validate,x.shape',x.shape)
 
-                x, y = self.source_dataset._val_sync_transform(self.result_tran(x), y)
-                x = x.unsqueeze(0)
-                # y.to(torch.long)
+                # x = x.unsqueeze(0)
                 if self.cuda:
                     x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
                 # model
@@ -539,7 +556,10 @@ class Trainer():
     def load_checkpoint(self, filename):
         try:
             self.logger.info("Loading checkpoint '{}'".format(filename))
-            checkpoint = torch.load(filename)
+            if self.cuda:
+                checkpoint = torch.load(filename)
+            else:
+                checkpoint = torch.load(filename,map_location=torch.device('cpu'))
 
             if 'state_dict' in checkpoint:
                 self.model.load_state_dict(checkpoint['state_dict'])
@@ -570,9 +590,9 @@ class Trainer():
         if len(optimizer.param_groups) == 3:
             optimizer.param_groups[2]["lr"] = new_lr
 
-    def adain_lr_scheduler(self, optimizer, iteration_count):
+    def adain_lr_scheduler(self, optimizer, iteration_count, lr):
         """Imitating the original implementation"""
-        lr = args.lr / (1.0 + 5e-5 * iteration_count)
+        lr = lr / (1.0 + 5e-5 * iteration_count)
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
 
@@ -617,13 +637,13 @@ def add_train_args(arg_parser):
     # dataset related arguments
     arg_parser.add_argument('--dataset', default='cityscapes', type=str,
                             help='dataset choice')
-    arg_parser.add_argument('--base_size', default="1280,640", type=str, # for random crop
+    arg_parser.add_argument('--base_size', default="1024,512", type=str, # for random crop
                             help='crop size of image')
-    arg_parser.add_argument('--crop_size', default="1280,640", type=str,
+    arg_parser.add_argument('--crop_size', default="1024,512", type=str,
                             help='base size of image')
-    arg_parser.add_argument('--target_base_size', default="1280,640", type=str, # for random crop
+    arg_parser.add_argument('--target_base_size', default="1024,512", type=str, # for random crop
                             help='crop size of target image')
-    arg_parser.add_argument('--target_crop_size', default="1280,640", type=str,
+    arg_parser.add_argument('--target_crop_size', default="1024,512", type=str,
                             help='base size of target image')
     arg_parser.add_argument('--num_classes', default=19, type=int,
                             help='num class of mask')
@@ -633,17 +653,16 @@ def add_train_args(arg_parser):
                             help='pin_memory of Dataloader')
     arg_parser.add_argument('--split', type=str, default='train',
                             help="choose from train/val/test/trainval/all")
-    arg_parser.add_argument('--random_mirror', default=True, type=str2bool,
+    arg_parser.add_argument('--random_mirror', default=False, type=str2bool,
                             help='add random_mirror')
     arg_parser.add_argument('--random_crop', default=False, type=str2bool,
                         help='add random_crop')
     arg_parser.add_argument('--resize', default=True, type=str2bool,
                         help='resize')
-    arg_parser.add_argument('--gaussian_blur', default=True, type=str2bool,
+    arg_parser.add_argument('--gaussian_blur', default=False, type=str2bool,
                         help='add gaussian_blur')
     arg_parser.add_argument('--numpy_transform', default=True, type=str2bool,
-                        help='image transform with numpy style, '
-                             'transform pic as image from 0-255，rather than tensor from 0-1')
+                        help='transform pic using numpy with Means and BGR CHW')
 
     # optimization related arguments
 

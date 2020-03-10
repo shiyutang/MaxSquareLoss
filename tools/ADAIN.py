@@ -3,12 +3,11 @@ import os
 import sys
 from pathlib import Path
 import torch
-import pickle
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 from torchvision import transforms
 import torch.utils.data as data
-from PIL import Image, ImageFile
+from PIL import Image
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 import numpy
@@ -43,10 +42,27 @@ class UDATrainer(Trainer):
         self.source_dataloader = \
             data.DataLoader(self.source_dataset_train,
                            batch_size=self.args.batch_size,
-                           shuffle=True,
+                           shuffle=False,
                            num_workers=self.args.data_loader_workers,
                            pin_memory=self.args.pin_memory,
                            drop_last=True)
+
+        ### compare dataset and dataloader
+        # self.source_dataset_trans = GTA5_Dataset(args,
+        #    data_root_path=self.datasets_path["GTA5_ambulance_gta5pcity_retrain_alpha1stylewt1"]['data_root_path'],
+        #    list_path=self.datasets_path['GTA5_ambulance_gta5pcity_retrain_alpha1stylewt1']['list_path'],
+        #    gt_path=self.datasets_path['GTA5_ambulance_gta5pcity_retrain_alpha1stylewt1']['gt_path'],
+        #    split='train',
+        #    base_size=args.base_size,
+        #    crop_size=args.crop_size)
+        #
+        # self.source_dataloader_trans = \
+        #     data.DataLoader(self.source_dataset_trans,
+        #                    batch_size=self.args.batch_size,
+        #                    shuffle=False,
+        #                    num_workers=self.args.data_loader_workers,
+        #                    pin_memory=self.args.pin_memory,
+        #                    drop_last=True)
 
         ## source validation loader
         self.source_dataset_val = GTA5_Dataset(args,
@@ -56,7 +72,7 @@ class UDATrainer(Trainer):
                                        split='val_style',
                                        base_size=args.base_size,
                                        crop_size=args.crop_size)
-        self.source_val_dataloader = data.DataLoader\
+        self.source_dataloader_val = data.DataLoader\
                                     (self.source_dataset_val,
                                      batch_size=self.args.batch_size,
                                      shuffle=False,
@@ -65,7 +81,7 @@ class UDATrainer(Trainer):
                                      drop_last=True)
 
         ## target dataset train and validation
-        target_dataset_train =\
+        self.target_dataset_train =\
             City_Dataset(args,
                        data_root_path=self.datasets_path['cityscapes']['data_root_path'],
                        list_path=self.datasets_path['cityscapes']['list_path'],
@@ -75,7 +91,7 @@ class UDATrainer(Trainer):
                        crop_size=args.crop_size,
                        class_16=args.class_16)
         self.target_dataloader = data.DataLoader\
-                                       (target_dataset_train,
+                                       (self.target_dataset_train,
                                        batch_size=self.args.batch_size,
                                        shuffle=True,
                                        num_workers=self.args.data_loader_workers,
@@ -108,7 +124,7 @@ class UDATrainer(Trainer):
                               pin_memory=self.args.pin_memory,
                               drop_last=True))
 
-        self.batch_style = next(self.style_dataloader).cuda()
+        self.batch_style = next(self.style_dataloader)
 
         self.dataloader.val_loader = self.target_val_dataloader
 
@@ -118,9 +134,10 @@ class UDATrainer(Trainer):
         if torch.cuda.device_count()>=1:
             self.network = nn.DataParallel(self.network)
         self.network.train()
-        self.network.cuda()
+        if self.cuda:
+            self.network.cuda()
 
-
+        ## define target loss
         self.ignore_index = -1
         if self.args.target_mode == "hard":
             self.target_loss = nn.CrossEntropyLoss(ignore_index=-1)
@@ -149,11 +166,16 @@ class UDATrainer(Trainer):
         #      allparams,
         #      betas=(0.9, 0.99),
         #      weight_decay=self.args.weight_decay)
-        self.adain_optimizer = torch.optim.Adam(
-            self.network.module.parameters(),
-            lr=self.args.adain_lr)
+        if self.cuda:
+            self.adain_optimizer = torch.optim.Adam(
+                self.network.module.parameters(),
+                lr=self.args.adain_lr)
+        else:
+            self.adain_optimizer = torch.optim.Adam(
+                self.network.parameters(),
+                lr=self.args.adain_lr)
 
-    def save_tensor_as_Image(self,tensor,path,filename, cnt,nrow=8, padding=2,
+    def save_tensor_as_Image(self, tensor, path, filename, cnt, nrow=8, padding=2,
                normalize=False, range=None, scale_each=False, pad_value=0):
         if not os.path.exists(path):
             os.makedirs(path)
@@ -163,11 +185,13 @@ class UDATrainer(Trainer):
         image = tensor.cpu().clone()
         grid = make_grid(image, nrow=nrow, padding=padding, pad_value=pad_value,
                          normalize=normalize, range=range, scale_each=scale_each)
+        # print('grid.max(),x.min(),x.shape,x[0,0]', grid.max(), grid.min(), grid.shape, grid[0, 0,])
         # Add 0.5 after unnormalizing to [0, 255] to round to nearest integer
         ndarr = grid.mul_(255).add_(0.5).clamp_(0, 255).permute(1, 2, 0).to('cpu', torch.uint8).numpy()
+        # print('ndarr.max(),x.min(),x.shape,x[0,0]', ndarr.max(), ndarr.min(), ndarr.shape, ndarr[0, 0, 0])
         im = Image.fromarray(ndarr)
         outpath = os.path.join(path,filename)
-        if cnt%100 == 0:
+        if cnt%10000 == 0:
             im.save(outpath)
         return im
 
@@ -232,7 +256,6 @@ class UDATrainer(Trainer):
         self.loss_seg_value += self.loss_val.cpu().item() / self.iter_num
 
     def main(self):
-
         # load pretrained checkpoint
         if self.args.checkpoint_dir is not None:
             self.args.pretrained_ckpt_file = os.path.join(self.args.checkpoint_dir, self.restore_id + 'best.pth')
@@ -251,7 +274,6 @@ class UDATrainer(Trainer):
         self.args.iter_max = self.current_iter + self.dataloader.num_iterations * self.args.epoch_each_round * self.round_num
 
         # train
-        # self.validate() # check image summary
         self.train_round()
 
         self.writer.close()
@@ -271,95 +293,87 @@ class UDATrainer(Trainer):
             self.current_round += 1
 
     def train_one_epoch(self,epoch=0):
-        tqdm_epoch = tqdm(zip(self.source_dataloader, self.target_dataloader),
+        tqdm_epoch = tqdm(zip(self.source_dataloader, self.target_dataloader),#, self.source_dataloader_trans),
                           total=self.dataloader.num_iterations,
                           desc="Train Round-{}-Epoch-{}-total-{}". \
                           format(self.current_round,self.current_epoch + 1, self.epoch_num))
-        self.logger.info("Training one epoch... in the method defined by solve_gta5")
+        self.logger.info("Training one epoch... in the method defined by ADAIN")
         self.Eval.reset()
 
         # Initialize your average meters
         self.loss_seg_value = 0
-        # loss with self and init outside of epoch will accumulate for all the aux domains
         self.loss_target_value = 0
         self.loss_seg_value_2 = 0
         self.loss_target_value_2 = 0
         self.iter_num = self.dataloader.num_iterations
 
         # Set the model to be in training mode (for batchnorm and dropout)
-        if self.args.freeze_bn:
-            self.model.eval()
-            self.logger.info("freeze batch normalization successfully!")
-        else:
-            self.model.train()
+        self.model.train()
 
         self.style_loss_weight = 1
-
-        # print('self.args.numpy_transform is ', self.args.numpy_transform) True
         for batch_s, batch_t in tqdm_epoch:
             self.poly_lr_scheduler(optimizer=self.optimizer, init_lr=self.args.lr)
             # self.poly_lr_scheduler(optimizer = self.all_optimizer, init_lr = self.args.lr)
-            self.adain_lr_scheduler(optimizer=self.adain_optimizer,iteration_count=self.current_iter)
+            self.adain_lr_scheduler(optimizer=self.adain_optimizer,
+                                    iteration_count=self.current_iter,lr = args.adain_lr)
 
             ############################################
             # get source and target picture from ADAIN #
             ############################################
             ## source ##
-            content,source_label,__ = batch_s
-            trans_source = self.network(content,self.batch_style)
+            content, source_label_tf, source_id = batch_s
+            loss_s_source, loss_c_source, trans_source = self.network(content, self.batch_style)
 
-            trans_source_img = self.save_tensor_as_Image(tensor=trans_source,
-                                      path=os.path.join(self.args.save_dir,"picResult"),
-                                      filename='source_trans_epoch{}_curiter{}_stywt{}.png'.format(self.current_epoch,
-                                                        self.current_iter,self.style_loss_weight),
-                                      cnt=self.current_iter)
-
+            # print('trans_source.max(),x.min(),x.shape,x[0,0]',trans_source.max(),trans_source.min(),trans_source.shape)
+            trans_source_tensor = trans_source.mul_(255).add_(0.5).clamp_(0, 255).div_(255)
+            # im = Image.fromarray(trans_source_tensor.mul_.to(torch.uint8).numpy())
+            # im.save('/data/Projects/MaxSquareLoss/trans_source_tensor.jpg')
+            # print('trans_source_tensor,shape ,max ,min',trans_source_tensor.shape,trans_source_tensor.max(),trans_source_tensor.min())
+            # print('source_label_tf.max(),x.min(),x.shape,x[0,0]',source_label_tf.max(),source_label_tf.min(),source_label_tf.shape)
 
             ## target
-            content, target_label, __ = batch_t
-            trans_target= self.network(content,self.batch_style)
-
-            trans_target_img = self.save_tensor_as_Image(tensor=trans_target,
-                                      path=os.path.join(self.args.save_dir,"picResult"),
-                                      filename='target_trans_epoch{}_curiter{}_stywt{}.png'.format(self.current_epoch,
-                                                 self.current_iter,self.style_loss_weight),
-                                      cnt=self.current_iter)
+            content, _, target_id = batch_t
+            loss_s_target, loss_c_target, trans_target= self.network(content,self.batch_style)
+            trans_target_tensor = trans_target.mul_(255).add_(0.5).clamp_(0, 255).div_(255)
+            # print('trans_target_tensor.max(),x.min(),x.shape,x[0,0]',trans_target_tensor.max(),trans_target_tensor.min(),trans_target_tensor.shape)
 
             ##########################
             # source supervised loss #
             ##########################
-            # train with source
-            x = self.source_dataset_val._train_sync_transform(trans_source_img,source_label).unsqueeze(0) ###
-
             if self.cuda:
-                x, y = Variable(x).to(self.device), \
-                       Variable(y).to(device=self.device, dtype=torch.long)
+                x, y = Variable(trans_source_tensor).to(self.device), \
+                       Variable(source_label_tf).to(device=self.device, dtype=torch.long)
 
             pred = self.model(x)
-            self.train_source(pred, source_label)
+            self.train_source(pred, y)
             #####################
             # train with target #
             #####################
-            x = self.target_data_set._train_sync_transform(trans_target_img,None).unsqueeze(0)
             if self.cuda:
-                x = Variable(x).to(self.device)
+                x = Variable(trans_target_tensor).to(self.device)
 
             pred = self.model(x)
-
             self.train_target(pred)
 
             self.optimizer.step()
             self.optimizer.zero_grad()
 
-            # self.adain_optimizer.step()
-            # self.adain_optimizer.zero_grad()
+            self.adain_optimizer.step()
+            self.adain_optimizer.zero_grad()
 
             self.current_iter += 1
+            # if self.current_iter == 1:
+            #     break
 
         self.writer.add_scalar('train_loss', self.loss_seg_value, self.current_epoch)
         tqdm.write("The average loss of train epoch-{}-:{}".format(self.current_epoch, self.loss_seg_value))
         self.writer.add_scalar('target_loss', self.loss_target_value, self.current_epoch)
         tqdm.write("The average target_loss of train epoch-{}-:{:.3f}".format(self.current_epoch, self.loss_target_value))
+        self.writer.add_scalar('loss_c_source',loss_c_source,self.current_epoch)
+        self.writer.add_scalar('loss_c_target',loss_c_target,self.current_epoch)
+        self.writer.add_scalar('loss_s_source',loss_s_source,self.current_epoch)
+        self.writer.add_scalar('loss_s_target',loss_s_target,self.current_epoch)
+
         if self.args.multi:
             self.writer.add_scalar('train_loss_2', self.loss_seg_value_2, self.current_epoch)
             tqdm.write("The average loss_2 of train epoch-{}-:{}"
@@ -371,8 +385,6 @@ class UDATrainer(Trainer):
 
         # eval on source domain
         self.validate_source()
-        # self.logger.info("learning rate for epoch {} is  {}".
-        #                  format(self.current_epoch, self.optimizer.param_groups[0]["lr"]))
 
 
 def add_UDA_train_args(arg_parser):

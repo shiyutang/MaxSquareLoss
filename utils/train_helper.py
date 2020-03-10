@@ -174,69 +174,76 @@ class Net(nn.Module):
         return self.mse_loss(input_mean, target_mean) + \
                self.mse_loss(input_std, target_std)
 
-    def test(self,content,batch_style,save_path,alpha=1.0,
-             weights=(1,1,1,1)):
-        assert (0.0<=alpha<=1.0)
-        # print('start producing test images')
-        interpolation_weights = [i / sum(weights) for i in weights]
-        style = torch.stack(list(batch_style))
-        content = content.expand_as(style)  ## problem alert: value in the wrong way
-
-        style = style.cuda()
-        content = content.cuda()
-
-        content_f = self.encode(content)
-        style_f = self.encode(style)
-
-        _, C, H, W = content_f.size()
-        feat = torch.FloatTensor(1, C, H, W).zero_().cuda()
-        base_feat = adaptive_instance_normalization(content_f,style_f)
-        for i,w in enumerate(interpolation_weights):
-            feat = feat + w*base_feat[i:i+1]
-
-        feat = feat*alpha+content_f[0:1]*(1-alpha)
-        gt = self.decoder(feat)
-
-        return gt
-
-    def forward(self, content, batch_style, alpha=1.0,
+    def forward_future(self, content, batch_style, alpha=1.0,
                         weights=(1,1,1,1),save_path = None):
+
         assert 0 <= alpha <= 1
-        style = batch_style.cuda()
-        # print('batch_style.size inside', style.size())
-        content = content.expand_as(style)
-        content = content.cuda()
+        if torch.cuda.is_available():
+            batch_style = batch_style.cuda()
+
+        content = content.expand_as(batch_style)
+        if torch.cuda.is_available():
+            content = content.cuda()
 
         interpolation_weights = [i / sum(weights) for i in weights]
 
+        # fusion style
+        _,C,H,W = batch_style.size()
+        style_gather = torch.FloatTensor(1,C,H,W).zero_()
+        if torch.cuda.is_available():
+            style_gather = style_gather.cuda()
+        for j,wt in enumerate(interpolation_weights):
+            style_gather += wt * batch_style[j:j+1]
+
+        style_gather = self.encode_with_intermediate(style_gather)
+
+        style_f = self.encoder(batch_style)
         content_f = self.encoder(content)
-        style_f = self.encoder(style)
 
         _, C, H, W = content_f.size()
-        feat = torch.FloatTensor(1, C, H, W).zero_().cuda()
-        base_feat = adaptive_instance_normalization(content_f,style_f)
+        feat = torch.FloatTensor(1, C, H, W).zero_()
+        if torch.cuda.is_available():
+            feat = feat.cuda()
+        base_feat = adaptive_instance_normalization(content_f, style_f)
         for i, w in enumerate(interpolation_weights):
             feat = feat + w * base_feat[i:i + 1]
 
         t = alpha * feat+ (1 - alpha) * content_f[0:1]
 
         g_t = self.decoder(t)
-        # with open('/data/Projects/MaxSquareLoss/output/adain_out/adain_g_t.pickle', 'wb') as handle:
-        #     pickle.dump(g_t.cpu(), handle, protocol=pickle.HIGHEST_PROTOCOL)
-        # style_gt = decoder(style_f)
-        # style_g_t = pickle.load(open("/data/Projects/MaxSquareLoss/output/style_out/style_g_t.pickle", "rb" ))
-        # g_tcpu = g_t.cpu()
-        # a = abs(g_tcpu-style_g_t)
-        # b = a<=0.01
+        g_t_feats = self.encode_with_intermediate(g_t)
 
-        # with open(save_path, "w+") as f:
-        #     f.write('b is {},\n gt is {} \n  \
-        #              a is {},\n style_g_t is {}'
-        #             .format(b,g_tcpu, content_f, g_t, a, style_g_t))
-        #     # f.write('style_g_t[0,0,0,0] {},g_t[0,0,0,0] {},{}'.format(
-        #     #     style_g_t[0,0,0,0],g_t[0,0,0,0],style_g_t[0,2,6,7]==g_t[0,2,6,7]))
+        loss_c = self.calc_content_loss(g_t_feats[-1],t)
+        loss_s = self.calc_style_loss(g_t_feats[-1],style_gather[-1])
+        for i in range(len(interpolation_weights)-1):
+            loss_s += self.calc_style_loss(g_t_feats[i],style_gather[i])
 
-        return  g_t
+        return loss_s, loss_c, g_t
+
+    def forward(self, content, batch_style, alpha=1.0,
+                        weights=(1,1,1,1),save_path = None):
+        assert 0 <= alpha <= 1
+        if torch.cuda.is_available():
+            batch_style = batch_style.cuda()
+        # print('batch_style.size inside', style.size())
+        content = content.expand_as(batch_style)
+        if torch.cuda.is_available():
+            content = content.cuda()
+        interpolation_weights = [i / sum(weights) for i in weights]
+        content_f = self.encoder(content)
+        style_f = self.encoder(batch_style)
+
+        _, C, H, W = content_f.size()
+        feat = torch.FloatTensor(1, C, H, W).zero_()
+        if torch.cuda.is_available():
+            feat = feat.cuda()
+        base_feat = adaptive_instance_normalization(content_f,style_f)
+        for i, w in enumerate(interpolation_weights):
+            feat = feat + w * base_feat[i:i + 1]
+        t = alpha * feat+ (1 - alpha) * content_f[0:1]
+        g_t = self.decoder(t)
+
+        return  0,0,g_t
 
     def train_single(self, content, style, alpha=1.0,
                 weights=(1,1,1,1)):

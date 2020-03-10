@@ -83,24 +83,30 @@ class GTA5_Dataset(City_Dataset):
         # print("{} num images in GTA5 {} set have been loaded.".format(len(self.items), self.split))
 
     def __getitem__(self, item):
-        id = int(self.items[item][-9:-4])
+        # id = int(self.items[item][-9:-4])
+        id = int(self.items[item])
 
         image_path = os.path.join(self.image_filepath, "{:0>5d}.png".format(id))
         image = Image.open(image_path).convert("RGB")
 
         gt_image_path = os.path.join(self.gt_filepath, "{:0>5d}.png".format(id))
         gt_image = Image.open(gt_image_path)
+        # print('gt_image.size',gt_image.size) # 1914,1052
 
         if 'style' in self.split:
             image_tf = self.adain_transform()(image)
+            if ("train" in self.split or "trainval" in self.split) and self.training:
+                _, gt_image = self._train_sync_transform(image, gt_image)
+            else:
+                _, gt_image = self._val_sync_transform(image, gt_image)
+
         else:
             if ("train" in self.split or "trainval" in self.split) and self.training:
                 image_tf, gt_image = self._train_sync_transform(image, gt_image)
             else:
                 image_tf, gt_image = self._val_sync_transform(image, gt_image)
 
-
-        return image_tf, gt_image, id
+        return image_tf, gt_image, str(id)
 
 class GTA5_DataLoader():
     def __init__(self, args, training=True,datasets_path=None):
