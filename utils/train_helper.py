@@ -174,13 +174,12 @@ class Net(nn.Module):
         return self.mse_loss(input_mean, target_mean) + \
                self.mse_loss(input_std, target_std)
 
-    def forward_future(self, content, batch_style, alpha=1.0,
-                        weights=(1,1,1,1),save_path = None):
+    def forward(self, content, batch_style, alpha=1.0,
+                        weights=(1,1,1,1)):
 
         assert 0 <= alpha <= 1
         if torch.cuda.is_available():
             batch_style = batch_style.cuda()
-
         content = content.expand_as(batch_style)
         if torch.cuda.is_available():
             content = content.cuda()
@@ -188,13 +187,12 @@ class Net(nn.Module):
         interpolation_weights = [i / sum(weights) for i in weights]
 
         # fusion style
-        _,C,H,W = batch_style.size()
-        style_gather = torch.FloatTensor(1,C,H,W).zero_()
+        _, C, H, W = batch_style.size()
+        style_gather = torch.FloatTensor(1, C, H, W).zero_()
         if torch.cuda.is_available():
             style_gather = style_gather.cuda()
         for j,wt in enumerate(interpolation_weights):
             style_gather += wt * batch_style[j:j+1]
-
         style_gather = self.encode_with_intermediate(style_gather)
 
         style_f = self.encoder(batch_style)
@@ -207,7 +205,6 @@ class Net(nn.Module):
         base_feat = adaptive_instance_normalization(content_f, style_f)
         for i, w in enumerate(interpolation_weights):
             feat = feat + w * base_feat[i:i + 1]
-
         t = alpha * feat+ (1 - alpha) * content_f[0:1]
 
         g_t = self.decoder(t)
@@ -220,7 +217,7 @@ class Net(nn.Module):
 
         return loss_s, loss_c, g_t
 
-    def forward(self, content, batch_style, alpha=1.0,
+    def forward_past(self, content, batch_style, alpha=1.0,
                         weights=(1,1,1,1),save_path = None):
         assert 0 <= alpha <= 1
         if torch.cuda.is_available():

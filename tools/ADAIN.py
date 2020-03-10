@@ -324,6 +324,7 @@ class UDATrainer(Trainer):
             content, source_label_tf, source_id = batch_s
             loss_s_source, loss_c_source, trans_source = self.network(content, self.batch_style)
 
+
             # print('trans_source.max(),x.min(),x.shape,x[0,0]',trans_source.max(),trans_source.min(),trans_source.shape)
             trans_source_tensor = trans_source.mul_(255).add_(0.5).clamp_(0, 255).div_(255)
             # im = Image.fromarray(trans_source_tensor.mul_.to(torch.uint8).numpy())
@@ -336,6 +337,12 @@ class UDATrainer(Trainer):
             loss_s_target, loss_c_target, trans_target= self.network(content,self.batch_style)
             trans_target_tensor = trans_target.mul_(255).add_(0.5).clamp_(0, 255).div_(255)
             # print('trans_target_tensor.max(),x.min(),x.shape,x[0,0]',trans_target_tensor.max(),trans_target_tensor.min(),trans_target_tensor.shape)
+
+            self.adain_optimizer.zero_grad()
+            style_losses = loss_c_target+loss_c_source+self.style_loss_weight\
+                           * loss_s_source+self.style_loss_weight * loss_s_target
+            style_losses.backward()
+            self.adain_optimizer.step()
 
             ##########################
             # source supervised loss #
@@ -357,9 +364,6 @@ class UDATrainer(Trainer):
 
             self.optimizer.step()
             self.optimizer.zero_grad()
-
-            self.adain_optimizer.step()
-            self.adain_optimizer.zero_grad()
 
             self.current_iter += 1
             # if self.current_iter == 1:

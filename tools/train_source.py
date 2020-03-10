@@ -551,6 +551,8 @@ class Trainer():
             'optimizer': self.optimizer.state_dict(),
             'best_MIou':self.best_MIou
         }
+        if self.network:
+            state['network'] = self.netork.state_dict(),
         torch.save(state, filename)
 
     def load_checkpoint(self, filename):
