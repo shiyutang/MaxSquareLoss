@@ -5,7 +5,7 @@ from pathlib import Path
 import torch
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
-from torchvision import transforms
+from torchvision import transforms as ttransforms
 import torch.utils.data as data
 from PIL import Image
 from tensorboardX import SummaryWriter
@@ -305,6 +305,7 @@ class UDATrainer(Trainer):
         self.loss_target_value = 0
         self.loss_seg_value_2 = 0
         self.loss_target_value_2 = 0
+        self.std = None
         self.iter_num = self.dataloader.num_iterations
 
         # Set the model to be in training mode (for batchnorm and dropout)
@@ -328,18 +329,17 @@ class UDATrainer(Trainer):
             content, _, target_id = batch_t
             loss_s_target, loss_c_target, trans_target= self.network(content,self.batch_style)
 
-            # optimize the style transfer network with losses
-            # style_losses = loss_c_target + loss_c_source + self.style_loss_weight\
-            #                * loss_s_source+self.style_loss_weight * loss_s_target
-            #
-            # print('type(loss_s_target),type(style_losses)', type(loss_s_target),type(style_losses))
-            # style_losses.backward()
-
-
             ##########################
             # source supervised loss #
             ##########################
-            trans_source_tensor = trans_source.mul(255).add(0.5).clamp(0, 255).div(255) #.squeeze(0).permute(1, 2, 0)
+            trans_source = trans_source.mul(255).add(0.5).clamp(0, 255).div(255).squeeze(0)#.permute(1, 2, 0)
+            if self.current_iter == 0:
+                self.std, self.mean = torch.std_mean(trans_source,[1,2])
+            ttransforms.Normalize(self.mean, self.std, inplace=True)(trans_source)
+
+            trans_source_tensor = trans_source.unsqueeze(0)
+            # print('3',trans_source_tensor.shape)
+
 
             if self.cuda:
                 x, y = Variable(trans_source_tensor).to(self.device), \
@@ -350,7 +350,9 @@ class UDATrainer(Trainer):
             #####################
             # train with target #
             #####################
-            trans_target_tensor = trans_target.mul(255).add(0.5).clamp(0, 255).div(255)#.squeeze(0).permute(1,2,0)
+            trans_target = trans_target.mul(255).add(0.5).clamp(0, 255).div(255).squeeze(0)#.permute(1,2,0)
+            ttransforms.Normalize(self.mean, self.std, inplace=True)(trans_target)
+            trans_target_tensor = trans_target.unsqueeze(0)
 
             if self.cuda:
                 x = Variable(trans_target_tensor).to(self.device)

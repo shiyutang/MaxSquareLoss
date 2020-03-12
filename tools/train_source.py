@@ -11,7 +11,7 @@ from math import ceil
 import numpy as np
 from distutils.version import LooseVersion
 from tensorboardX import SummaryWriter
-from torchvision import  transforms
+from torchvision import  transforms as ttransforms
 
 import sys
 import random
@@ -368,9 +368,9 @@ class Trainer():
             for x, y, id in tqdm_batch:
                 _,_,x = self.network(x,self.batch_style)
                 # self.save_tensor_as_Image(x,path='/data/Project/',filename='test311target.png',cnt=0)
-                x = x.mul(255).add(0.5).clamp(0, 255).div(255)#.squeeze(0).permute(1,2,0) ## 1，3 512，1024
-
-                # x = self.target_dataset_val._img_transform(x)
+                x = x.mul(255).add(0.5).clamp(0, 255).div(255).squeeze(0)#.permute(1,2,0) ## 1，3 512，1024
+                ttransforms.Normalize(self.mean, self.std, inplace=True)(x)
+                x = x.unsqueeze(0)
 
                 if self.cuda:
                     x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
@@ -450,7 +450,9 @@ class Trainer():
             for x, y, id in tqdm_batch:
                 _,_,x = self.network(x,self.batch_style)
                 # self.save_tensor_as_Image(x,path='/data/Project/',filename='test311source.png',cnt=0)
-                x = x.mul(255).add(0.5).clamp(0, 255).div(255)#.squeeze(0).permute(1,2,0) ## 1，3 512，1024
+                x = x.mul(255).add(0.5).clamp(0, 255).div(255).squeeze(0)#.permute(1,2,0) ## 1，3 512，1024
+                ttransforms.Normalize(self.mean, self.std, inplace=True)(x)
+                x = x.unsqueeze(0)
 
                 # x = self.source_dataset_val._img_transform(x)
                 # print('source validate,x.shape',x.shape)
@@ -658,7 +660,7 @@ def add_train_args(arg_parser):
                             help='pin_memory of Dataloader')
     arg_parser.add_argument('--split', type=str, default='train',
                             help="choose from train/val/test/trainval/all")
-    arg_parser.add_argument('--random_mirror', default=False, type=str2bool,
+    arg_parser.add_argument('--random_mirror', default=True, type=str2bool,
                             help='add random_mirror')
     arg_parser.add_argument('--random_crop', default=False, type=str2bool,
                         help='add random_crop')
