@@ -138,7 +138,6 @@ class City_Dataset(data.Dataset):
         else:
             image_tf, gt_image = self._val_sync_transform(image, gt_image)
 
-
         return image_tf, gt_image, item
 
     def _train_sync_transform(self, img, mask):
@@ -158,14 +157,12 @@ class City_Dataset(data.Dataset):
             if mask: mask = mask.resize(self.crop_size, Image.NEAREST)
 
         # final transform
-        if mask: 
-            img  =  self._img_transform(img)
-            mask = self._mask_transform(mask)
-            return img, mask
+        img = ttransforms.ToTensor()(img)
+        if mask:
+            mask = self._mask_transform(mask) # array,idmatch,tensor
+            return img,mask
         else:
-            img = self._img_transform(img)
             return img
-
 
     def _val_sync_transform(self, img, mask):
         if self.resize:
@@ -174,7 +171,8 @@ class City_Dataset(data.Dataset):
                 mask = mask.resize(self.crop_size, Image.NEAREST)
 
         # final transform
-        img = self._img_transform(img)
+        # img = self._img_transform(img)
+        img = ttransforms.ToTensor()(img)
         if mask:
             mask = self._mask_transform(mask)
             return img,mask

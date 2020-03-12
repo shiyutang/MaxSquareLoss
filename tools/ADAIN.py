@@ -125,9 +125,7 @@ class UDATrainer(Trainer):
                               drop_last=True))
 
         self.batch_style = next(self.style_dataloader)
-
         self.dataloader.val_loader = self.target_val_dataloader
-
         self.dataloader.valid_iterations = (len(self.target_dataset_val) + self.args.batch_size) // self.args.batch_size
 
         self.network = Net()
@@ -174,6 +172,8 @@ class UDATrainer(Trainer):
             self.adain_optimizer = torch.optim.Adam(
                 self.network.parameters(),
                 lr=self.args.adain_lr)
+        self.optimizer.zero_grad()
+        self.adain_optimizer.zero_grad()
 
     def save_tensor_as_Image(self, tensor, path, filename, cnt, nrow=8, padding=2,
                normalize=False, range=None, scale_each=False, pad_value=0):
@@ -313,7 +313,6 @@ class UDATrainer(Trainer):
         self.style_loss_weight = 1
         for batch_s, batch_t in tqdm_epoch:
             self.poly_lr_scheduler(optimizer=self.optimizer, init_lr=self.args.lr)
-            # self.poly_lr_scheduler(optimizer = self.all_optimizer, init_lr = self.args.lr)
             self.adain_lr_scheduler(optimizer=self.adain_optimizer,
                                     iteration_count=self.current_iter,lr = args.adain_lr)
 
@@ -322,31 +321,26 @@ class UDATrainer(Trainer):
             ############################################
             ## source ##
             content, source_label_tf, source_id = batch_s
-            loss_s_source, loss_c_source, trans_source = self.network(content, self.batch_style)
-
-
-            # print('trans_source.max(),x.min(),x.shape,x[0,0]',trans_source.max(),trans_source.min(),trans_source.shape)
-            trans_source_tensor = trans_source.mul_(255).add_(0.5).clamp_(0, 255).div_(255)
-            # im = Image.fromarray(trans_source_tensor.mul_.to(torch.uint8).numpy())
-            # im.save('/data/Projects/MaxSquareLoss/trans_source_tensor.jpg')
-            # print('trans_source_tensor,shape ,max ,min',trans_source_tensor.shape,trans_source_tensor.max(),trans_source_tensor.min())
-            # print('source_label_tf.max(),x.min(),x.shape,x[0,0]',source_label_tf.max(),source_label_tf.min(),source_label_tf.shape)
+            loss_s_source, loss_c_source, trans_source = self.network(content, self.batch_style)  #输出正确
+            # self.save_tensor_as_Image(trans_source,path='/data/Project/',filename='test311train.png',cnt=0)
 
             ## target
             content, _, target_id = batch_t
             loss_s_target, loss_c_target, trans_target= self.network(content,self.batch_style)
-            trans_target_tensor = trans_target.mul_(255).add_(0.5).clamp_(0, 255).div_(255)
-            # print('trans_target_tensor.max(),x.min(),x.shape,x[0,0]',trans_target_tensor.max(),trans_target_tensor.min(),trans_target_tensor.shape)
 
-            self.adain_optimizer.zero_grad()
-            style_losses = loss_c_target+loss_c_source+self.style_loss_weight\
-                           * loss_s_source+self.style_loss_weight * loss_s_target
-            style_losses.backward()
-            self.adain_optimizer.step()
+            # optimize the style transfer network with losses
+            # style_losses = loss_c_target + loss_c_source + self.style_loss_weight\
+            #                * loss_s_source+self.style_loss_weight * loss_s_target
+            #
+            # print('type(loss_s_target),type(style_losses)', type(loss_s_target),type(style_losses))
+            # style_losses.backward()
+
 
             ##########################
             # source supervised loss #
             ##########################
+            trans_source_tensor = trans_source.mul(255).add(0.5).clamp(0, 255).div(255) #.squeeze(0).permute(1, 2, 0)
+
             if self.cuda:
                 x, y = Variable(trans_source_tensor).to(self.device), \
                        Variable(source_label_tf).to(device=self.device, dtype=torch.long)
@@ -356,6 +350,8 @@ class UDATrainer(Trainer):
             #####################
             # train with target #
             #####################
+            trans_target_tensor = trans_target.mul(255).add(0.5).clamp(0, 255).div(255)#.squeeze(0).permute(1,2,0)
+
             if self.cuda:
                 x = Variable(trans_target_tensor).to(self.device)
 
@@ -364,6 +360,9 @@ class UDATrainer(Trainer):
 
             self.optimizer.step()
             self.optimizer.zero_grad()
+
+            self.adain_optimizer.step()
+            self.adain_optimizer.zero_grad()
 
             self.current_iter += 1
             # if self.current_iter == 1:

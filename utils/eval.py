@@ -44,8 +44,8 @@ class Eval():
 
     def Mean_Intersection_over_Union(self, out_16_13=False):
         MIoU = np.diag(self.confusion_matrix) / (
-                    np.sum(self.confusion_matrix, axis=1) + np.sum(self.confusion_matrix, axis=0) -
-                    np.diag(self.confusion_matrix))
+                np.sum(self.confusion_matrix, axis=1) + np.sum(self.confusion_matrix, axis=0) -
+                np.diag(self.confusion_matrix))
         if self.synthia:
             MIoU_16 = np.nanmean(MIoU[:self.ignore_index])
             MIoU_13 = np.nanmean(MIoU[synthia_set_16_to_13])

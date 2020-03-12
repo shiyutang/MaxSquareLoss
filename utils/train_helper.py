@@ -174,7 +174,7 @@ class Net(nn.Module):
         return self.mse_loss(input_mean, target_mean) + \
                self.mse_loss(input_std, target_std)
 
-    def forward(self, content, batch_style, alpha=1.0,
+    def forward_with_losses(self, content, batch_style, alpha=1.0,
                         weights=(1,1,1,1)):
 
         assert 0 <= alpha <= 1
@@ -217,7 +217,7 @@ class Net(nn.Module):
 
         return loss_s, loss_c, g_t
 
-    def forward_past(self, content, batch_style, alpha=1.0,
+    def forward(self, content, batch_style, alpha=1.0,
                         weights=(1,1,1,1),save_path = None):
         assert 0 <= alpha <= 1
         if torch.cuda.is_available():

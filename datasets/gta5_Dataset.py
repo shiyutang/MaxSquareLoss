@@ -91,20 +91,11 @@ class GTA5_Dataset(City_Dataset):
 
         gt_image_path = os.path.join(self.gt_filepath, "{:0>5d}.png".format(id))
         gt_image = Image.open(gt_image_path)
-        # print('gt_image.size',gt_image.size) # 1914,1052
 
-        if 'style' in self.split:
-            image_tf = self.adain_transform()(image)
-            if ("train" in self.split or "trainval" in self.split) and self.training:
-                _, gt_image = self._train_sync_transform(image, gt_image)
-            else:
-                _, gt_image = self._val_sync_transform(image, gt_image)
-
+        if ("train" in self.split or "trainval" in self.split) and self.training:
+            image_tf, gt_image = self._train_sync_transform(image, gt_image)
         else:
-            if ("train" in self.split or "trainval" in self.split) and self.training:
-                image_tf, gt_image = self._train_sync_transform(image, gt_image)
-            else:
-                image_tf, gt_image = self._val_sync_transform(image, gt_image)
+            image_tf, gt_image = self._val_sync_transform(image, gt_image)
 
         return image_tf, gt_image, str(id)
 

@@ -367,9 +367,10 @@ class Trainer():
                 self.model.eval()
             for x, y, id in tqdm_batch:
                 _,_,x = self.network(x,self.batch_style)
-                x = x.mul_(255).add_(0.5).clamp_(0, 255).div_(255) ## 1，3 512，1024
-                # print('validate,x.shape',x.shape)
-                # x = x.unsqueeze(0)
+                # self.save_tensor_as_Image(x,path='/data/Project/',filename='test311target.png',cnt=0)
+                x = x.mul(255).add(0.5).clamp(0, 255).div(255)#.squeeze(0).permute(1,2,0) ## 1，3 512，1024
+
+                # x = self.target_dataset_val._img_transform(x)
 
                 if self.cuda:
                     x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
@@ -448,10 +449,12 @@ class Trainer():
             i = 0
             for x, y, id in tqdm_batch:
                 _,_,x = self.network(x,self.batch_style)
-                x = x.mul_(255).add_(0.5).clamp_(0, 255).div_(255) # 1，3，512，1024
+                # self.save_tensor_as_Image(x,path='/data/Project/',filename='test311source.png',cnt=0)
+                x = x.mul(255).add(0.5).clamp(0, 255).div(255)#.squeeze(0).permute(1,2,0) ## 1，3 512，1024
+
+                # x = self.source_dataset_val._img_transform(x)
                 # print('source validate,x.shape',x.shape)
 
-                # x = x.unsqueeze(0)
                 if self.cuda:
                     x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
                 # model
@@ -552,7 +555,7 @@ class Trainer():
             'best_MIou':self.best_MIou
         }
         if self.network:
-            state['network'] = self.netork.state_dict(),
+            state['network'] = self.network.state_dict(),
         torch.save(state, filename)
 
     def load_checkpoint(self, filename):
