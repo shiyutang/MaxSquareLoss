@@ -182,7 +182,7 @@ class City_Dataset(data.Dataset):
     def _img_transform(self, image):
         if self.args.numpy_transform:
             image = np.asarray(image, np.float32)
-            image = image[:, :, ::-1]  # change to BGR
+            image = image[:, :, ::-1]  # change to gbr
             image -= IMG_MEAN
             image = image.transpose((2, 0, 1)).copy() # (C x H x W)
             new_image = torch.from_numpy(image)

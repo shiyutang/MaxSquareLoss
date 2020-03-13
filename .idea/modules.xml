@@ -3,7 +3,6 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/MaxSquareLoss.iml" filepath="$PROJECT_DIR$/.idea/MaxSquareLoss.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../pytorch-AdaIN/.idea/pytorch-AdaIN.iml" filepath="$PROJECT_DIR$/../pytorch-AdaIN/.idea/pytorch-AdaIN.iml" />
     </modules>
   </component>
 </project>

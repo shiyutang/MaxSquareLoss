@@ -345,17 +345,21 @@ class Trainer():
         self.writer.add_scalar('train_loss', tr_loss, self.current_epoch)
         tqdm.write("The average loss of train epoch-{}-:{}".format(self.current_epoch, tr_loss))
 
-    def result_tran(self,tensor,nrow=8, padding=2,
-               normalize=False, range=None, scale_each=False, pad_value=0):
-        from PIL import Image
-        from utils.train_helper import make_grid
-        image = tensor.cpu().clone()
-        grid = make_grid(image, nrow=nrow, padding=padding, pad_value=pad_value,
-                         normalize=normalize, range=range, scale_each=scale_each)
-        # Add 0.5 after unnormalizing to [0, 255] to round to nearest integer
-        ndarr = grid.mul_(255).add_(0.5).clamp_(0, 255).permute(1, 2, 0).to('cpu', torch.uint8).numpy()
-        im = Image.fromarray(ndarr)
-        return im
+    def seg_transform(self,tensor):
+        trans_source_tensor = tensor.mul(255).add(0.5).clamp(0, 255)
+
+        d = torch.Tensor([122.67891434, 104.00698793, 116.66876762]).reshape(-1, 1, 1).expand(-1, 512, 1024).cuda()
+        trans_source_tensor = trans_source_tensor.squeeze(0) - d
+        r = trans_source_tensor[0, :, :]
+        g = trans_source_tensor[1, :, :]
+        b = trans_source_tensor[2, :, :]
+        result = torch.stack([g, b, r], dim=0).unsqueeze(0)
+
+        # if self.current_iter == 0:
+        #     self.std, self.mean = torch.std_mean(trans_source,[1,2])
+        # ttransforms.Normalize(self.mean, self.std, inplace=True)(trans_source)
+        # trans_source_tensor = trans_source.unsqueeze(0)
+        return result
 
     def validate(self, mode='val'):
         self.logger.info('\nvalidating one epoch...')
@@ -367,10 +371,7 @@ class Trainer():
                 self.model.eval()
             for x, y, id in tqdm_batch:
                 _,_,x = self.network(x,self.batch_style)
-                # self.save_tensor_as_Image(x,path='/data/Project/',filename='test311target.png',cnt=0)
-                x = x.mul(255).add(0.5).clamp(0, 255).div(255).squeeze(0)#.permute(1,2,0) ## 1，3 512，1024
-                ttransforms.Normalize(self.mean, self.std, inplace=True)(x)
-                x = x.unsqueeze(0)
+                x = self.seg_transform(x)
 
                 if self.cuda:
                     x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
@@ -449,13 +450,7 @@ class Trainer():
             i = 0
             for x, y, id in tqdm_batch:
                 _,_,x = self.network(x,self.batch_style)
-                # self.save_tensor_as_Image(x,path='/data/Project/',filename='test311source.png',cnt=0)
-                x = x.mul(255).add(0.5).clamp(0, 255).div(255).squeeze(0)#.permute(1,2,0) ## 1，3 512，1024
-                ttransforms.Normalize(self.mean, self.std, inplace=True)(x)
-                x = x.unsqueeze(0)
-
-                # x = self.source_dataset_val._img_transform(x)
-                # print('source validate,x.shape',x.shape)
+                x = self.seg_transform(x)
 
                 if self.cuda:
                     x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
