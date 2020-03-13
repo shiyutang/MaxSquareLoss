@@ -43,7 +43,7 @@ class UDATrainer(Trainer):
         self.source_dataloader = \
             data.DataLoader(self.source_dataset_train,
                            batch_size=self.args.batch_size,
-                           shuffle=False,
+                           shuffle=True,
                            num_workers=self.args.data_loader_workers,
                            pin_memory=self.args.pin_memory,
                            drop_last=True)
@@ -157,6 +157,7 @@ class UDATrainer(Trainer):
             self.adain_optimizer = torch.optim.Adam(
                 self.network.parameters(),
                 lr=self.args.adain_lr)
+
         self.optimizer.zero_grad()
         self.adain_optimizer.zero_grad()
 
@@ -341,25 +342,21 @@ class UDATrainer(Trainer):
             pred = self.model(x)
             self.train_target(pred)
 
-            # self.optimizer.step()
-            # self.optimizer.zero_grad()
+            self.optimizer.step()
+            self.optimizer.zero_grad()
 
-            # self.adain_optimizer.step()
-            # self.adain_optimizer.zero_grad()
+            self.adain_optimizer.step()
+            self.adain_optimizer.zero_grad()
 
             self.current_iter += 1
-            if self.current_iter == 1:
-                break
+            # if self.current_iter == 1:
+            #     break
 
         self.scheduler.step(self.loss_seg_value)
         self.writer.add_scalar('train_loss', self.loss_seg_value, self.current_epoch)
         tqdm.write("The average loss of train epoch-{}-:{}".format(self.current_epoch, self.loss_seg_value))
         self.writer.add_scalar('target_loss', self.loss_target_value, self.current_epoch)
         tqdm.write("The average target_loss of train epoch-{}-:{:.3f}".format(self.current_epoch, self.loss_target_value))
-        # self.writer.add_scalar('loss_c_source',loss_c_source,self.current_epoch)
-        # self.writer.add_scalar('loss_c_target',loss_c_target,self.current_epoch)
-        # self.writer.add_scalar('loss_s_source',loss_s_source,self.current_epoch)
-        # self.writer.add_scalar('loss_s_target',loss_s_target,self.current_epoch)
 
         if self.args.multi:
             self.writer.add_scalar('train_loss_2', self.loss_seg_value_2, self.current_epoch)

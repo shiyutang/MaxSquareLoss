@@ -346,20 +346,20 @@ class Trainer():
         tqdm.write("The average loss of train epoch-{}-:{}".format(self.current_epoch, tr_loss))
 
     def seg_transform(self,tensor):
-        trans_source_tensor = tensor.mul(255).add(0.5).clamp(0, 255)
+        trans_source_tensor = tensor.mul(255).add(0.5).clamp(0, 255)-120
 
-        d = torch.Tensor([122.67891434, 104.00698793, 116.66876762]).reshape(-1, 1, 1).expand(-1, 512, 1024).cuda()
-        trans_source_tensor = trans_source_tensor.squeeze(0) - d
-        r = trans_source_tensor[0, :, :]
-        g = trans_source_tensor[1, :, :]
-        b = trans_source_tensor[2, :, :]
-        result = torch.stack([g, b, r], dim=0).unsqueeze(0)
+        # d = torch.Tensor([122.67891434, 104.00698793, 116.66876762]).reshape(-1, 1, 1).expand(-1, 512, 1024).cuda()
+        # trans_source_tensor = trans_source_tensor.squeeze(0) - d
+        # r = trans_source_tensor[0, :, :]
+        # g = trans_source_tensor[1, :, :]
+        # b = trans_source_tensor[2, :, :]
+        # trans_source_tensor = torch.stack([g, b, r], dim=0).unsqueeze(0)
 
         # if self.current_iter == 0:
         #     self.std, self.mean = torch.std_mean(trans_source,[1,2])
         # ttransforms.Normalize(self.mean, self.std, inplace=True)(trans_source)
         # trans_source_tensor = trans_source.unsqueeze(0)
-        return result
+        return trans_source_tensor
 
     def validate(self, mode='val'):
         self.logger.info('\nvalidating one epoch...')
