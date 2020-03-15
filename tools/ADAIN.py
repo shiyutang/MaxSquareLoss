@@ -309,20 +309,18 @@ class UDATrainer(Trainer):
             ############################################
             ## source ##
             content, source_label_tf, source_id = batch_s
-            loss_s_source, loss_c_source, trans_source = self.network(content, self.batch_style)  #输出正确
+            # loss_s_source, loss_c_source, trans_source = self.network(content, self.batch_style)  #输出正确
             # self.save_tensor_as_Image(trans_source,path='/data/result/',filename='test311train.png',cnt=0)
 
             tmp = Image.open('/data/result/test311.png')
             tmp = self.source_dataset_train._img_transform(tmp)
 
-            torch.save(trans_source_tensor,'/data/result/trans_source.pt')
-            # trans_source = torch.load('/data/result/trans_source.pt')
+            # torch.save(trans_source,'/data/result/trans_source.pt')
+            trans_source = torch.load('/data/result/trans_source.pt')
             trans_source = trans_source.mul(255).add(0.5).clamp(0, 255)
             trans_source_tf= self.seg_transform(trans_source)
 
-            cmp = Image.open('/data/Projects/ADVENT/data/GTA5_ambulance_gta5pcity_retrain_alpha1stylewt1/images/00001.png')
-            cmp = np.asarray(cmp, np.float32)
-            cmp = torch.from_numpy(cmp)
+            cmp = torch.load('/data/result/train_trans_pic.pt')
             cmp_tf = torch.load('/data/result/train_trans_1.pt')
 
             ## target
