@@ -244,9 +244,9 @@ class UDATrainer(Trainer):
 
     def main(self):
         # load pretrained checkpoint
-        if self.args.checkpoint_dir is not None:
-            # self.args.pretrained_ckpt_file = os.path.join(self.args.checkpoint_dir, self.restore_id + 'best.pth')
-            self.load_checkpoint(self.args.checkpoint_dir)
+        # if self.args.checkpoint_dir is not None:
+        #     self.args.pretrained_ckpt_file = os.path.join(self.args.checkpoint_dir, self.restore_id + 'best.pth')
+            # self.load_checkpoint(self.args.checkpoint_dir)
 
         if not self.args.continue_training:
             self.best_MIou = 0
@@ -311,9 +311,19 @@ class UDATrainer(Trainer):
             content, source_label_tf, source_id = batch_s
             loss_s_source, loss_c_source, trans_source = self.network(content, self.batch_style)  #输出正确
             # self.save_tensor_as_Image(trans_source,path='/data/result/',filename='test311train.png',cnt=0)
-            # tmp = Image.open('/data/result/test311.png')
-            # tmp = self.source_dataset_train._img_transform(tmp)
-            # trans_source_tensor = self.seg_transform(trans_source)
+
+            tmp = Image.open('/data/result/test311.png')
+            tmp = self.source_dataset_train._img_transform(tmp)
+
+            torch.save(trans_source_tensor,'/data/result/trans_source.pt')
+            # trans_source = torch.load('/data/result/trans_source.pt')
+            trans_source = trans_source.mul(255).add(0.5).clamp(0, 255)
+            trans_source_tf= self.seg_transform(trans_source)
+
+            cmp = Image.open('/data/Projects/ADVENT/data/GTA5_ambulance_gta5pcity_retrain_alpha1stylewt1/images/00001.png')
+            cmp = np.asarray(cmp, np.float32)
+            cmp = torch.from_numpy(cmp)
+            cmp_tf = torch.load('/data/result/train_trans_1.pt')
 
             ## target
             content, _, target_id = batch_t
