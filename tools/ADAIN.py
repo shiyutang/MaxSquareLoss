@@ -43,7 +43,7 @@ class UDATrainer(Trainer):
         self.source_dataloader = \
             data.DataLoader(self.source_dataset_train,
                             batch_size=self.args.batch_size,
-                            shuffle=False,
+                            shuffle=True,
                             num_workers=self.args.data_loader_workers,
                             pin_memory=self.args.pin_memory,
                             drop_last=True)
