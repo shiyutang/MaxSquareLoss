@@ -359,9 +359,11 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
         if do_interpolation:
             style = torch.stack([style_tf(Image.open(file))
                                     for file in style_paths])
-
-            content = content_tf(Image.open(content_path)).\
-                                    unsqueeze(0).expand_as(style)
+            content = content_tf(Image.open(content_path))
+            print('content.shape',content.shape)
+            content = content[:,0:512,0:1024]
+            print('content.shape',content.shape)
+            content = content.unsqueeze(0).expand_as(style)
             style = style.to(device)
             content = content.to(device)
 
@@ -373,7 +375,7 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
                        interpolation_weights = interpolation_weight)
 
             output_Tensor.cpu()
-            out_name = Path.joinpath(output_dir,str(content_path.stem)+".{}".format(save_ext))
+            out_name = Path.joinpath(output_dir,str(content_path.stem)+"crop.{}".format(save_ext))
             save_image(output_Tensor,out_name)
 
         else:
@@ -398,7 +400,9 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
 
 if __name__ == '__main__':
     # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/Cityscapes/leftImg8bit/val").glob("*")]
-    content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][0:10]
+    # content_dirs = [Path("/data/Projects/ADVENT/data/Cityscapes/leftImg8bit/val/frankfurt/frankfurt_000000_001236_leftImg8bit.png")]
+    content_dirs = [Path("/data/Projects/ADVENT/data/GTA5/images/00001.png")]
+    # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][0:10]
     # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][2497:4994]
     # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][4994:7491]
     # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][7491:9988]
@@ -415,14 +419,19 @@ if __name__ == '__main__':
 
     style_dir= Path("/data/Projects/MaxSquareLoss/imagenet_style/ambulance")#style_dirs[4]
     print("style_dir",style_dir)
-    for content in tqdm(content_dirs):
-        style = random.sample([p for p in style_dir.glob("*")],1)
-        style_transfer_AdaIN(content=content, content_dir=None, style=style, style_dir=None,
-                             vgg_pretrain="/data/Projects/pytorch-AdaIN/models/vgg_normalised.pth",
-                             # decoder_pretrain="/data/Projects/pytorch-AdaIN/experiments/decoder_iter_160000.pth.tar",
-                             decoder_pretrain='/data/Projects/pytorch-AdaIN/models/decoder.pth',
-                             vgg=vgg,decoder=decoder,do_interpolation=False,
-                             content_size=(512,1024), style_size=(512,1024), crop=None, save_ext="png",
-                             output_path='/data/Projects/MaxSquareLoss/output/style_out',
-                             preserve_color=None, alpha=1.0,
-                             style_interpolation_weight=style_interpolation_weight, exp_tag=exp_tag)
+    networks = ['experiments/gta5pcity_ambulance_alpha1wts1']
+    for network in networks:
+        for content in tqdm(content_dirs):
+            style = random.sample([p for p in style_dir.glob("*")],4)
+            style_transfer_AdaIN(content=content, content_dir=None, style=style, style_dir=None,
+                                 vgg_pretrain="/data/Projects/pytorch-AdaIN/models/vgg_normalised.pth",
+                                 # vgg_pretrain='/data/Projects/pytorch-AdaIN/experiments/gta5pcity_ambulance_alpha1wts1_upVGG/vgg_iter_160000.pth.tar',
+                                 # decoder_pretrain="/data/Projects/pytorch-AdaIN/experiments/gta5pcity_ambulance_alpha1wts1/decoder_iter_160000.pth.tar",
+                                 # decoder_pretrain='/data/Projects/pytorch-AdaIN/models/decoder_.pth',
+                                 decoder_pretrain='/data/Projects/pytorch-AdaIN/{}/decoder_iter_160000.pth.tar'.format(network),
+                                 vgg=vgg,decoder=decoder,do_interpolation=True,
+                                 content_size=(1024,2048), style_size=(512,1024), crop=None, save_ext="png",
+                                 # output_path='/data/Projects/MaxSquareLoss/output/style_out',
+                                 output_path='/data/result/{}'.format(network),
+                                 preserve_color=None, alpha=1.0,
+                                 style_interpolation_weight=style_interpolation_weight, exp_tag=exp_tag)

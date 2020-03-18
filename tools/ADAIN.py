@@ -30,66 +30,66 @@ class UDATrainer(Trainer):
     def __init__(self, args, cuda=True, train_id="None", logger=None):
         super().__init__(args, cuda, train_id, logger)  # 调用父类的初始化，这样不用重写函数，同时初始化了应有的参数
         self.scheduler = lr_scheduler.ReduceLROnPlateau(optimizer=self.optimizer,
-                                                     mode='min', factor=0.9, patience=3, verbose=True)
+                                                        mode='min', factor=0.9, patience=3, verbose=True)
 
         ## source train loader
         self.source_dataset_train = GTA5_Dataset(args,
-                               data_root_path=self.datasets_path["gta5"]['data_root_path'],
-                               list_path=self.datasets_path['gta5']['list_path'],
-                               gt_path=self.datasets_path['gta5']['gt_path'],
-                               split='train_style',
-                               base_size=args.base_size,
-                               crop_size=args.crop_size)
+                                                 data_root_path=self.datasets_path["gta5"]['data_root_path'],
+                                                 list_path=self.datasets_path['gta5']['list_path'],
+                                                 gt_path=self.datasets_path['gta5']['gt_path'],
+                                                 split='train_style',
+                                                 base_size=args.base_size,
+                                                 crop_size=args.crop_size)
         self.source_dataloader = \
             data.DataLoader(self.source_dataset_train,
-                           batch_size=self.args.batch_size,
-                           shuffle=True,
-                           num_workers=self.args.data_loader_workers,
-                           pin_memory=self.args.pin_memory,
-                           drop_last=True)
+                            batch_size=self.args.batch_size,
+                            shuffle=False,
+                            num_workers=self.args.data_loader_workers,
+                            pin_memory=self.args.pin_memory,
+                            drop_last=True)
 
         ## source validation loader
         self.source_dataset_val = GTA5_Dataset(args,
-                                       data_root_path=self.datasets_path['gta5']['data_root_path'],
-                                       list_path=self.datasets_path['gta5']['list_path'],
-                                       gt_path=self.datasets_path['gta5']['gt_path'],
-                                       split='val_style',
-                                       base_size=args.base_size,
-                                       crop_size=args.crop_size)
-        self.source_dataloader_val = data.DataLoader\
-                                    (self.source_dataset_val,
-                                     batch_size=self.args.batch_size,
-                                     shuffle=False,
-                                     num_workers=self.args.data_loader_workers,
-                                     pin_memory=self.args.pin_memory,
-                                     drop_last=True)
+                                               data_root_path=self.datasets_path['gta5']['data_root_path'],
+                                               list_path=self.datasets_path['gta5']['list_path'],
+                                               gt_path=self.datasets_path['gta5']['gt_path'],
+                                               split='val_style',
+                                               base_size=args.base_size,
+                                               crop_size=args.crop_size)
+        self.source_dataloader_val = data.DataLoader \
+            (self.source_dataset_val,
+             batch_size=self.args.batch_size,
+             shuffle=False,
+             num_workers=self.args.data_loader_workers,
+             pin_memory=self.args.pin_memory,
+             drop_last=True)
 
         ## target dataset train and validation
-        self.target_dataset_train =\
+        self.target_dataset_train = \
             City_Dataset(args,
-                       data_root_path=self.datasets_path['cityscapes']['data_root_path'],
-                       list_path=self.datasets_path['cityscapes']['list_path'],
-                       gt_path=self.datasets_path['cityscapes']['gt_path'],
-                       split='train_style',
-                       base_size=args.base_size,
-                       crop_size=args.crop_size,
-                       class_16=args.class_16)
-        self.target_dataloader = data.DataLoader\
-                                       (self.target_dataset_train,
-                                       batch_size=self.args.batch_size,
-                                       shuffle=True,
-                                       num_workers=self.args.data_loader_workers,
-                                       pin_memory=self.args.pin_memory,
-                                       drop_last=True)
+                         data_root_path=self.datasets_path['cityscapes']['data_root_path'],
+                         list_path=self.datasets_path['cityscapes']['list_path'],
+                         gt_path=self.datasets_path['cityscapes']['gt_path'],
+                         split='train_style',
+                         base_size=args.base_size,
+                         crop_size=args.crop_size,
+                         class_16=args.class_16)
+        self.target_dataloader = data.DataLoader \
+            (self.target_dataset_train,
+             batch_size=self.args.batch_size,
+             shuffle=True,
+             num_workers=self.args.data_loader_workers,
+             pin_memory=self.args.pin_memory,
+             drop_last=True)
         self.target_dataset_val = \
             City_Dataset(args,
-                       data_root_path=self.datasets_path['cityscapes']['data_root_path'],
-                       list_path=self.datasets_path['cityscapes']['list_path'],
-                       gt_path=self.datasets_path['cityscapes']['gt_path'],
-                       split='val_style',
-                       base_size=args.base_size,
-                       crop_size=args.crop_size,
-                       class_16=args.class_16)
+                         data_root_path=self.datasets_path['cityscapes']['data_root_path'],
+                         list_path=self.datasets_path['cityscapes']['list_path'],
+                         gt_path=self.datasets_path['cityscapes']['gt_path'],
+                         split='val_style',
+                         base_size=args.base_size,
+                         crop_size=args.crop_size,
+                         class_16=args.class_16)
 
         self.target_val_dataloader = data.DataLoader(self.target_dataset_val,
                                                      batch_size=self.args.batch_size,
@@ -100,25 +100,23 @@ class UDATrainer(Trainer):
 
         style_dataset = FlatFolderDataset(
             root="/data/Projects/MaxSquareLoss/imagenet_style/ambulance",
-            transform=self.source_dataset_val.adain_transform())
+            transform=self.source_dataset_val.adain_transform(size=(self.args.base_size[0],self.args.base_size[1])))
 
         self.style_dataloader=iter(data.DataLoader(style_dataset,
-                              batch_size=4,
-                              shuffle=False,
-                              num_workers=self.args.data_loader_workers,
-                              pin_memory=self.args.pin_memory,
-                              drop_last=True))
+                                                   batch_size=4,
+                                                   shuffle=False,
+                                                   num_workers=self.args.data_loader_workers,
+                                                   pin_memory=self.args.pin_memory,
+                                                   drop_last=True))
 
         self.batch_style = next(self.style_dataloader)
         self.dataloader.val_loader = self.target_val_dataloader
         self.dataloader.valid_iterations = (len(self.target_dataset_val) + self.args.batch_size) // self.args.batch_size
 
         self.network = Net()
-        if torch.cuda.device_count()>=1:
-            self.network = nn.DataParallel(self.network)
+        # if self.cuda:
+        #     self.network.cuda()
         self.network.train()
-        if self.cuda:
-            self.network.cuda()
 
         ## define target loss
         self.ignore_index = -1
@@ -143,18 +141,8 @@ class UDATrainer(Trainer):
         self.target_hard_loss = nn.CrossEntropyLoss(ignore_index=-1)
 
         ## initially add network parameters into
-        # allparams = self.params+[{'params':self.network.parameters(),'lr':self.args.lr}]
-        #
-        # self.all_optimizer = torch.optim.Adam(
-        #      allparams,
-        #      betas=(0.9, 0.99),
-        #      weight_decay=self.args.weight_decay)
-        if self.cuda:
-            self.adain_optimizer = torch.optim.Adam(
-                self.network.module.parameters(),
-                lr=self.args.adain_lr)
-        else:
-            self.adain_optimizer = torch.optim.Adam(
+
+        self.adain_optimizer = torch.optim.Adam(
                 self.network.parameters(),
                 lr=self.args.adain_lr)
 
@@ -244,9 +232,8 @@ class UDATrainer(Trainer):
 
     def main(self):
         # load pretrained checkpoint
-        # if self.args.checkpoint_dir is not None:
-        #     self.args.pretrained_ckpt_file = os.path.join(self.args.checkpoint_dir, self.restore_id + 'best.pth')
-            # self.load_checkpoint(self.args.checkpoint_dir)
+        if self.args.checkpoint_dir is not None:
+            self.load_checkpoint(self.args.checkpoint_dir)
 
         if not self.args.continue_training:
             self.best_MIou = 0
@@ -279,6 +266,32 @@ class UDATrainer(Trainer):
 
             self.current_round += 1
 
+    def cropT(self,tensor):
+        if len(tensor.shape) == 4:
+            tensor = tensor.squeeze(0)
+        c,h,w = tensor.shape
+        a1 = tensor[:,0:h//2, 0:w//2]
+        a2 = tensor[:,0:h//2, w//2:w]
+        a3 = tensor[:,h//2:h, 0:w//2]
+        a4 = tensor[:,h//2:h, w//2:w]
+        return a1,a2,a3,a4
+
+    def catT(self,a1,a2,a3,a4):
+        aup = torch.cat((a1,a2),dim=2)
+        adown = torch.cat((a3,a4),dim=2)
+        a = torch.cat((aup,adown),dim=1)
+        return a
+
+    def cropTrans(self,content):
+        contents = self.cropT(content)
+        trans_results = []
+        for c in contents:
+            ct = self.network(c.unsqueeze(0), self.batch_style)  # 输出正确
+            trans_results.append(ct.squeeze(0))
+        result = self.catT(trans_results[0], trans_results[1], trans_results[2], trans_results[3])
+        return result.unsqueeze(0)
+
+
     def train_one_epoch(self,epoch=0):
         tqdm_epoch = tqdm(zip(self.source_dataloader, self.target_dataloader),#, self.source_dataloader_trans),
                           total=self.dataloader.num_iterations,
@@ -309,33 +322,28 @@ class UDATrainer(Trainer):
             ############################################
             ## source ##
             content, source_label_tf, source_id = batch_s
-            # loss_s_source, loss_c_source, trans_source = self.network(content, self.batch_style)  #输出正确
-            # self.save_tensor_as_Image(trans_source,path='/data/result/',filename='test311train.png',cnt=0)
-
-            tmp = Image.open('/data/result/test311.png')
-            tmp = self.source_dataset_train._img_transform(tmp)
-
-            # torch.save(trans_source,'/data/result/trans_source.pt')
-            trans_source = torch.load('/data/result/trans_source.pt')
-            trans_source = trans_source.mul(255).add(0.5).clamp(0, 255)
-            trans_source_tf= self.seg_transform(trans_source)
-
-            cmp = torch.load('/data/result/train_trans_pic.pt')
-            cmp_tf = torch.load('/data/result/train_trans_1.pt')
+            trans_source = self.network(content,self.batch_style)
+            # self.save_tensor_as_Image(trans_source, path='/data/result/', filename='317.png', cnt=0)
 
             ## target
             content, _, target_id = batch_t
-            loss_s_target, loss_c_target, trans_target= self.network(content,self.batch_style)
+            trans_target = self.network(content,self.batch_style)
+            # self.save_tensor_as_Image(trans_target, path='/data/result/', filename='317.png', cnt=0)
 
             ##########################
             # source supervised loss #
             ##########################
             trans_source_tensor = self.seg_transform(trans_source)
+            if self.args.seg_size != self.args.base_size:
+                import torch.nn.functional as F
+                source_label_tf = F.interpolate(source_label_tf.unsqueeze(0), size=[self.args.seg_size[1], self.args.seg_size[0]]).squeeze(0)
+
 
             if self.cuda:
-                x, y = Variable(trans_source_tensor).to(self.device), \
-                       Variable(source_label_tf).to(device=self.device, dtype=torch.long)
+                x, y = Variable(trans_source_tensor).to('cuda:0'), \
+                       Variable(source_label_tf).to(device='cuda:0', dtype=torch.long)
 
+            # print('x.device',x.device,x.shape,y.shape)
             pred = self.model(x)
             self.train_source(pred, y)
 
@@ -345,10 +353,11 @@ class UDATrainer(Trainer):
             trans_target_tensor = self.seg_transform(trans_target)
 
             if self.cuda:
-                x = Variable(trans_target_tensor).to(self.device)
+                x = Variable(trans_target_tensor).to('cuda:0')
 
             pred = self.model(x)
             self.train_target(pred)
+
 
             self.optimizer.step()
             self.optimizer.zero_grad()
@@ -376,7 +385,7 @@ class UDATrainer(Trainer):
         tqdm_epoch.close()
 
         # eval on source domain
-        self.validate_source()
+        # self.validate_source()
 
 
 def add_UDA_train_args(arg_parser):
@@ -387,14 +396,14 @@ def add_UDA_train_args(arg_parser):
                             help='source datasets split')
     arg_parser.add_argument('--init_round', type=int, default=0,
                             help='init_round')
-    arg_parser.add_argument('--round_num', type=int, default=1,
+    arg_parser.add_argument('--round_num', type=int, default=40,
                             help="num round")
     arg_parser.add_argument('--epoch_each_round', type=int, default=2,
                             help="epoch each round")
-    arg_parser.add_argument('--target_mode', type=str, default="maxsquare",
+    arg_parser.add_argument('--target_mode', type=str, default="IW_maxsquare",
                             choices=['maxsquare', 'IW_maxsquare', 'entropy', 'IW_entropy', 'hard'],
                             help="the loss function on target domain")
-    arg_parser.add_argument('--lambda_target', type=float, default=1,
+    arg_parser.add_argument('--lambda_target', type=float, default=0.09,
                             help="lambda of target loss")
     arg_parser.add_argument('--gamma', type=float, default=0,
                             help='parameter for scaled entorpy')

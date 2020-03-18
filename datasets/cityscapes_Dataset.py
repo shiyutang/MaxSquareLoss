@@ -201,13 +201,13 @@ class City_Dataset(data.Dataset):
 
         return target
 
-    def adain_transform(self):
+    def adain_transform(self,size):
         from torchvision import transforms
-        base_size = (self.base_size[1],self.base_size[0])
-        crop_size = (self.crop_size[1],self.crop_size[0])
+        base_size = (size[1],size[0])
+        # crop_size = (self.crop_size[1],self.crop_size[0])
         transform_list = [
             transforms.Resize(size=base_size),  # (h,w) 512, 1024
-            transforms.RandomCrop(crop_size),
+            # transforms.RandomCrop(crop_size),
             transforms.ToTensor()
         ]
         return transforms.Compose(transform_list)
