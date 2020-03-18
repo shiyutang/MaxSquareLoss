@@ -141,13 +141,13 @@ class Trainer():
 
         # model
         self.model, self.params = get_model(self.args)
-        if torch.cuda.device_count()>1:
-            print("let us use {} GPUs".format(torch.cuda.device_count()))
-            self.model = nn.DataParallel(self.model)
-        elif torch.cuda.device_count()==1:
+        # if torch.cuda.device_count()>1:
+        #     print("let us use {} GPUs".format(torch.cuda.device_count()))
+        #     self.model = nn.DataParallel(self.model,device_ids=[i for i in range(torch.cuda.device_count()//2,torch.cuda.device_count())])
+        if torch.cuda.is_available():
             self.model = nn.DataParallel(self.model, device_ids=[0])
 
-        self.model.to(self.device)
+        self.model.to('cuda:0')
 
         # optimizer
         if self.args.optim == "SGD":
@@ -307,8 +307,8 @@ class Trainer():
             argpred = np.argmax(pred, axis=1)
             self.Eval.add_batch(label, argpred)
 
-            if batch_idx==self.dataloader.num_iterations:
-                break
+            # if batch_idx==self.dataloader.num_iterations:
+            #     break
         
         self.log_one_train_epoch(x, label, argpred, train_loss)
         tqdm_epoch.close()
@@ -345,16 +345,26 @@ class Trainer():
         self.writer.add_scalar('train_loss', tr_loss, self.current_epoch)
         tqdm.write("The average loss of train epoch-{}-:{}".format(self.current_epoch, tr_loss))
 
-    def seg_transform(self,trans_source_tensor):
-        # trans_source_tensor = tensor.mul(255).add(0.5).clamp(0, 255)#-120
-        d = torch.Tensor([122.67891434, 104.00698793, 116.66876762]).reshape(-1, 1, 1).expand(-1, 512, 1024)
+    def seg_transform(self,tensor):
+        # print('tensor.shape',tensor.shape)
+        size = [self.args.base_size[1], self.args.base_size[0]]
+        if self.args.seg_size != self.args.base_size:
+            import torch.nn.functional as F
+            tensor = F.interpolate(tensor, size=[self.args.seg_size[1],self.args.seg_size[0]])
+            size = [self.args.seg_size[1], self.args.seg_size[0]]
+
+        # print('tensor.shape, for segnet',tensor.shape)
+
+        trans_source_tensor = tensor.mul(255).add(0.5).clamp(0, 255)#-120
+        # print('tensor.shape',tensor.shape)
+        d = torch.Tensor([122.67891434, 116.66876762,104.00698793]).reshape(-1, 1, 1).expand(-1, size[0], size[1])
         if torch.cuda.is_available():
-            d.cuda()
+            d = d.to('cuda:3')
         trans_source_tensor = trans_source_tensor.squeeze(0) - d
         r = trans_source_tensor[0, :, :]
         g = trans_source_tensor[1, :, :]
         b = trans_source_tensor[2, :, :]
-        trans_source_tensor = torch.stack([g, b, r], dim=0).unsqueeze(0)
+        trans_source_tensor = torch.stack([b, g, r], dim=0).unsqueeze(0)
 
         # if self.current_iter == 0:
         #     self.std, self.mean = torch.std_mean(trans_source,[1,2])
@@ -371,11 +381,14 @@ class Trainer():
             if mode == 'val':
                 self.model.eval()
             for x, y, id in tqdm_batch:
-                _,_,x = self.network(x,self.batch_style)
+                x = self.network(x,self.batch_style)
                 x = self.seg_transform(x)
+                if self.args.seg_size != self.args.base_size:
+                    import torch.nn.functional as F
+                    y = F.interpolate(y.unsqueeze(0), size=[self.args.seg_size[1], self.args.seg_size[0]]).squeeze(0)
 
                 if self.cuda:
-                    x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
+                    x, y = x.to('cuda:0'), y.to(device='cuda:0', dtype=torch.long)
                 # model
                 pred = self.model(x)                   
                 if isinstance(pred, tuple):
@@ -450,11 +463,14 @@ class Trainer():
             self.model.eval()
             i = 0
             for x, y, id in tqdm_batch:
-                _,_,x = self.network(x,self.batch_style)
+                x = self.network(x,self.batch_style)
                 x = self.seg_transform(x)
+                if self.args.seg_size != self.args.base_size:
+                    y = F.interpolate(y.unsqueeze(0), size=[self.args.seg_size[1], self.args.seg_size[0]]).squeeze(0)
+
 
                 if self.cuda:
-                    x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
+                    x, y = x.to('cuda:0'), y.to(device='cuda:0', dtype=torch.long)
                 # model
                 pred = self.model(x)
 
@@ -545,15 +561,20 @@ class Trainer():
         :return:
         """
         filename = os.path.join(self.args.save_dir, filename)
+        if torch.cuda.device_count()>1:
+            statedict = self.model.module.state_dict()
+        else:
+            statedict = self.model.state_dict()
+        netdict = self.network.state_dict()
         state = {
             'epoch': self.current_epoch + 1,
             'iteration': self.current_iter,
-            'state_dict': self.model.state_dict(),
+            'state_dict': statedict,
             'optimizer': self.optimizer.state_dict(),
             'best_MIou':self.best_MIou
         }
         if self.network:
-            state['network'] = self.network.state_dict(),
+            state['network'] = netdict,
         torch.save(state, filename)
 
     def load_checkpoint(self, filename):
@@ -565,9 +586,19 @@ class Trainer():
                 checkpoint = torch.load(filename,map_location=torch.device('cpu'))
 
             if 'state_dict' in checkpoint:
+                print('state_dict in checkpoint')
                 self.model.load_state_dict(checkpoint['state_dict'])
             else:
                 self.model.module.load_state_dict(checkpoint)
+                # # create new OrderedDict that does not contain `module.`
+                # from collections import OrderedDict
+                # new_state_dict = OrderedDict()
+                # for k, v in checkpoint.items():
+                #     name = k[7:]  # remove `module.`
+                #     new_state_dict[name] = v
+                # # load params
+                # self.model.load_state_dict(new_state_dict)
+
             self.logger.info("Checkpoint loaded successfully from "+filename)
 
             if "optimizer" in checkpoint:
@@ -606,9 +637,9 @@ def add_train_args(arg_parser):
                             help="the root path of dataset")
     arg_parser.add_argument('--list_path', type=str, default=None,
                             help="the root path of dataset")
-    arg_parser.add_argument('--checkpoint_dir', default="./log/train",
+    arg_parser.add_argument('--checkpoint_dir', default="./log/train/trans_gta5_pretrain_add_multi/IW_MS_trans_plateau/gta52cityscapes_IW_maxsquaremIOUbest_epoch_25.pth",
                             help="the path of ckpt file")
-    arg_parser.add_argument("--save_dir",default="./log/train",
+    arg_parser.add_argument("--save_dir",default="./log/train/trans_gta5_pretrain_add_multi/IW_MS_UNION_seg_trans_test_add_multi/",
                             help="the path that you want to save all the output")
     arg_parser.add_argument("--restore_id",type=str, default="add_multi",
                             help="the id that help find load model")
@@ -640,14 +671,16 @@ def add_train_args(arg_parser):
     # dataset related arguments
     arg_parser.add_argument('--dataset', default='cityscapes', type=str,
                             help='dataset choice')
-    arg_parser.add_argument('--base_size', default="1024,512", type=str, # for random crop
+    arg_parser.add_argument('--base_size', default="1843,922", type=str, # for random crop
                             help='crop size of image')
-    arg_parser.add_argument('--crop_size', default="1024,512", type=str,
+    arg_parser.add_argument('--crop_size', default="1843,922", type=str,
                             help='base size of image')
-    arg_parser.add_argument('--target_base_size', default="1024,512", type=str, # for random crop
+    arg_parser.add_argument('--target_base_size', default="1843,922", type=str, # for random crop
                             help='crop size of target image')
-    arg_parser.add_argument('--target_crop_size', default="1024,512", type=str,
+    arg_parser.add_argument('--target_crop_size', default="1843,922", type=str,
                             help='base size of target image')
+    arg_parser.add_argument('--seg_size', default=(1280,640),
+                            help='the size input to segmentation network')
     arg_parser.add_argument('--num_classes', default=19, type=int,
                             help='num class of mask')
     arg_parser.add_argument('--data_loader_workers', default=1, type=int,
@@ -687,7 +720,7 @@ def add_train_args(arg_parser):
 
     # multi-level output
 
-    arg_parser.add_argument('--multi', default=False, type=str2bool,
+    arg_parser.add_argument('--multi', default=True, type=str2bool,
                         help='output model middle feature')
     arg_parser.add_argument('--lambda_seg', type=float, default=0.1,
                         help="lambda_seg of middle output")
