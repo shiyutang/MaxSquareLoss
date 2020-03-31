@@ -137,8 +137,11 @@ class Net(nn.Module):
         self.enc_4 = nn.Sequential(*enc_layers[18:31])  # relu3_1 -> relu4_1
         self.encoder = nn.Sequential(*list(vgg.children())[:31]).to('cuda:2')
 
+        pretrained_decoder = 'gta5pcity_ambulance_alpha1wts1awts1e-3_affineloss_pretrain11/decoder_iter_57000.pth.tar'
         decoder.load_state_dict(
-                torch.load('/data/Projects/pytorch-AdaIN/experiments/gta5pcity_ambulance_alpha1wts1/decoder_iter_160000.pth.tar'))
+                torch.load('/data/Projects/pytorch-AdaIN/experiments/{}'.format(pretrained_decoder)))
+        print('###################################')
+        print('the decoder is from {}'.format(pretrained_decoder))
         dec_layers = list(decoder.children())
         self.dec_1 = nn.Sequential(*dec_layers[:10]).to('cuda:2')
         self.dec_4 = nn.Sequential(*dec_layers[10:24]).to('cuda:1')

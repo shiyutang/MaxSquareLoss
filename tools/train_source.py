@@ -23,7 +23,6 @@ from datasets.cityscapes_Dataset import City_Dataset, City_DataLoader, inv_prepr
 from datasets.gta5_Dataset import GTA5_DataLoader
 from datasets.synthia_Dataset import SYNTHIA_DataLoader
 
-
 datasets_path={
     'cityscapes': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes',
                    'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
@@ -346,7 +345,11 @@ class Trainer():
         tqdm.write("The average loss of train epoch-{}-:{}".format(self.current_epoch, tr_loss))
 
     def seg_transform(self,tensor):
-        # print('tensor.shape',tensor.shape)
+        '''
+        :param tensor: the tensor after style transform
+        :functionality: resize the tensor for segmentation network
+        :return: resized and transformed tensor ready to be parsed of shape (batch,channel,height,width)
+        '''
         size = [self.args.base_size[1], self.args.base_size[0]]
         if self.args.seg_size != self.args.base_size:
             import torch.nn.functional as F
@@ -366,10 +369,6 @@ class Trainer():
         b = trans_source_tensor[2, :, :]
         trans_source_tensor = torch.stack([b, g, r], dim=0).unsqueeze(0)
 
-        # if self.current_iter == 0:
-        #     self.std, self.mean = torch.std_mean(trans_source,[1,2])
-        # ttransforms.Normalize(self.mean, self.std, inplace=True)(trans_source)
-        # trans_source_tensor = trans_source.unsqueeze(0)
         return trans_source_tensor
 
     def validate(self, mode='val'):
@@ -384,7 +383,6 @@ class Trainer():
                 x = self.network(x,self.batch_style)
                 x = self.seg_transform(x)
                 if self.args.seg_size != self.args.base_size:
-                    import torch.nn.functional as F
                     y = F.interpolate(y.unsqueeze(0), size=[self.args.seg_size[1], self.args.seg_size[0]]).squeeze(0)
 
                 if self.cuda:
@@ -671,9 +669,9 @@ def add_train_args(arg_parser):
     # dataset related arguments
     arg_parser.add_argument('--dataset', default='cityscapes', type=str,
                             help='dataset choice')
-    arg_parser.add_argument('--base_size', default="1843,922", type=str, # for random crop
+    arg_parser.add_argument('--base_size', default="1856,928", type=str, # for random crop
                             help='crop size of image')
-    arg_parser.add_argument('--crop_size', default="1843,922", type=str,
+    arg_parser.add_argument('--crop_size', default="1856,928", type=str,
                             help='base size of image')
     arg_parser.add_argument('--target_base_size', default="1843,922", type=str, # for random crop
                             help='crop size of target image')

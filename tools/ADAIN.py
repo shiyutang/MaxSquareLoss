@@ -43,7 +43,7 @@ class UDATrainer(Trainer):
         self.source_dataloader = \
             data.DataLoader(self.source_dataset_train,
                             batch_size=self.args.batch_size,
-                            shuffle=True,
+                            shuffle=False,
                             num_workers=self.args.data_loader_workers,
                             pin_memory=self.args.pin_memory,
                             drop_last=True)
@@ -149,7 +149,7 @@ class UDATrainer(Trainer):
         self.optimizer.zero_grad()
         self.adain_optimizer.zero_grad()
 
-    def save_tensor_as_Image(self, tensor, path, filename, cnt, nrow=8, padding=2,
+    def save_tensor_as_Image(self, tensor, path, filename, cnt=0, nrow=8, padding=2,
                normalize=False, range=None, scale_each=False, pad_value=0):
         if not os.path.exists(path):
             os.makedirs(path)
