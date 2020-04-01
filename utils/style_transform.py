@@ -10,7 +10,9 @@ from torchvision import transforms
 from torchvision.utils import save_image
 from tqdm import tqdm
 import pickle
+import torch.nn.functional as F
 
+torch.backends.cudnn.enabled = False
 
 def calc_mean_std(feat, eps=1e-5):
     # eps is a small value added to the variance to avoid divide-by-zero.
@@ -123,67 +125,6 @@ vgg = nn.Sequential(
 )
 
 
-class Net(nn.Module):
-    def __init__(self, encoder, decoder):
-        super(Net, self).__init__()
-        enc_layers = list(encoder.children())
-        self.enc_1 = nn.Sequential(*enc_layers[:4])  # input -> relu1_1
-        self.enc_2 = nn.Sequential(*enc_layers[4:11])  # relu1_1 -> relu2_1
-        self.enc_3 = nn.Sequential(*enc_layers[11:18])  # relu2_1 -> relu3_1
-        self.enc_4 = nn.Sequential(*enc_layers[18:31])  # relu3_1 -> relu4_1
-        self.decoder = decoder
-        self.mse_loss = nn.MSELoss()
-
-        # fix the encoder
-        for name in ['enc_1', 'enc_2', 'enc_3', 'enc_4']:
-            for param in getattr(self, name).parameters():
-                param.requires_grad = False
-
-    # extract relu1_1, relu2_1, relu3_1, relu4_1 from input image
-    def encode_with_intermediate(self, input):
-        results = [input]
-        for i in range(4):
-            func = getattr(self, 'enc_{:d}'.format(i + 1))
-            results.append(func(results[-1]))
-        return results[1:]
-
-    # extract relu4_1 from input image
-    def encode(self, input):
-        for i in range(4):
-            input = getattr(self, 'enc_{:d}'.format(i + 1))(input)
-        return input
-
-    def calc_content_loss(self, input, target):
-        assert (input.size() == target.size())
-        assert (target.requires_grad is False)
-        return self.mse_loss(input, target)
-
-    def calc_style_loss(self, input, target):
-        assert (input.size() == target.size())
-        assert (target.requires_grad is False)
-        input_mean, input_std = calc_mean_std(input)
-        target_mean, target_std = calc_mean_std(target)
-        return self.mse_loss(input_mean, target_mean) + \
-               self.mse_loss(input_std, target_std)
-
-    def forward(self, content, style, alpha=1.0):
-        assert 0 <= alpha <= 1
-        style_feats = self.encode_with_intermediate(style)
-        content_feat = self.encode(content)
-        t = adaptive_instance_normalization(
-                    content_feat, style_feats[-1])
-        t = alpha * t + (1 - alpha) * content_feat
-
-        g_t = self.decoder(t)
-        g_t_feats = self.encode_with_intermediate(g_t)
-
-        loss_c = self.calc_content_loss(g_t_feats[-1], t)
-        loss_s = self.calc_style_loss(g_t_feats[0], style_feats[0])
-        for i in range(1, 4):
-            loss_s += self.calc_style_loss(g_t_feats[i], style_feats[i])
-        return loss_c, loss_s
-
-
 def _calc_feat_flatten_mean_std(feat):
     # takes 3D feat (C, H, W), return mean and std of array within channels
     assert (feat.size()[0] == 3)
@@ -228,16 +169,12 @@ def coral(source, target):
     return source_f_transfer.view(source.size())
 
 
-
-
-
 def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_dir=None,
                    vgg_pretrain = "/data/Projects/pytorch-AdaIN/models/vgg_normalised.pth",vgg = vgg,
                    decoder_pretrain="/data/Projects/pytorch-AdaIN/models/decoder.pth",decoder=decoder,
                    content_size=(512, 1024),style_size=(512,1024),crop=None,save_ext=".jpg",
                    output_path="", preserve_color=None, alpha=1.0,
                    style_interpolation_weight=None, do_interpolation=False):
-
 
     def test_transform(size, crop):
         transform_list = []
@@ -253,8 +190,18 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
     def style_transfer(vgg, decoder, content, style, alpha=1.0,
                        device=None, interpolation_weights=None):
         assert (0.0 <= alpha <= 1.0)
-        content_f = vgg(content)
-        style_f = vgg(style)
+        # print(content,content.shape,content[0,0,1:4,2:9])
+        # content_f = vgg(content)
+        # style_f = vgg(style)
+        content_f = enc_1(content)
+        content_f = enc_2(content_f.to('cuda:1'))
+        content_f = enc_3(content_f.to('cuda:2'))
+        content_f = enc_4(content_f)
+
+        style_f = enc_1(style)
+        style_f = enc_2(style_f.to('cuda:1'))
+        style_f = enc_3(style_f.to('cuda:2'))
+        style_f = enc_4(style_f)
         if interpolation_weights:
             _, C, H, W = content_f.size()
             feat = torch.FloatTensor(1, C, H, W).zero_().to(device)
@@ -265,7 +212,7 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
         else:
             feat = adaptive_instance_normalization(content_f, style_f)
         feat = feat * alpha + content_f[0:1] * (1 - alpha)
-        g_t = decoder(feat)
+        g_t = decoder(feat.to('cuda:3'))
 
         return g_t
 
@@ -309,8 +256,8 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
 
     decoder.eval()
     vgg.eval()
-    decoderckpt = torch.load(decoder_pretrain)
 
+    decoderckpt = torch.load(decoder_pretrain)
     if 'loss_c_best' in decoderckpt:
         decoder.load_state_dict(decoderckpt['state_dict'])
         print('#######################################################')
@@ -323,8 +270,15 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
     vgg.load_state_dict(torch.load(vgg_pretrain))
     vgg = nn.Sequential(*list(vgg.children())[:31])
 
-    vgg.to(device)
-    decoder.to(device)
+    enc_layers = list(vgg.children())
+    enc_1 = nn.Sequential(*enc_layers[:4]).to('cuda:0')  # input -> relu1_1
+    enc_2 = nn.Sequential(*enc_layers[4:11]).to('cuda:1')  # relu1_1 -> relu2_1
+    enc_3 = nn.Sequential(*enc_layers[11:18]).to('cuda:2')  # relu2_1 -> relu3_1
+    enc_4 = nn.Sequential(*enc_layers[18:31]).to('cuda:2')  # relu3_1 -> relu4_1
+    decoder.to('cuda:3')
+
+    # vgg.to(device)
+    # decoder.to(device)
 
     content_tf = test_transform(content_size,crop)
     style_tf = test_transform(style_size,crop)
@@ -349,8 +303,8 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
                        alpha=alpha,device=device,
                        interpolation_weights = interpolation_weight)
 
-            output_Tensor.cpu()
-            out_name = Path.joinpath(output_dir, str(content_path.stem)+"stylized.{}".format(save_ext))
+            output_Tensor = F.interpolate(output_Tensor,size=[1024,2048]).cpu()
+            out_name = Path.joinpath(output_dir, str(content_path.stem)+".{}".format(save_ext))
             save_image(output_Tensor,out_name)
 
         else:
@@ -374,8 +328,8 @@ def style_transfer_AdaIN(content = None, content_dir= None, style=None, style_di
 
 
 if __name__ == '__main__':
-    # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/Cityscapes/leftImg8bit/val/frankfurt").glob("*")][0:10]
-    content_dirs = [f for f in Path('/data/result/cut').glob('*')]
+    content_dirs = [f for f in Path("/data/Projects/ADVENT/data/Cityscapes/leftImg8bit/val/frankfurt").glob("*")][0:10]
+    # content_dirs = [f for f in Path('/data/result/cut').glob('*')]
     # content_dirs = [Path("/data/Projects/ADVENT/data/Cityscapes/leftImg8bit/val/frankfurt/frankfurt_000000_001236_leftImg8bit.png")]
     # content_dirs = [Path("/data/Projects/ADVENT/data/GTA5/images/00001.png")]
     # content_dirs = [f for f in Path("/data/Projects/ADVENT/data/GTA5/images").glob("*")][0:10]
@@ -394,9 +348,9 @@ if __name__ == '__main__':
 
     style_dir= Path("/data/Projects/MaxSquareLoss/imagenet_style/ambulance") # style_dirs[4]
     print("style_dir",style_dir)
-    networks = [#'experiments/gta5pcity_ambulance_alpha1wts1awts1e-3_affineloss_pretrain11',
+    networks = ['experiments/gta5pcity_ambulance_alpha1wts1awts1e-3_affineloss_pretrain11']
                 # 'experiments/gta5pcity_ambulance_alpha1wts1awts1e-4_affineloss_pretrain11']
-                'experiments/gta5pcity_ambulance_alpha1wts1awts1e-4_affineloss_512r1024']
+                # 'experiments/gta5pcity_ambulance_alpha1wts1awts1e-4_affineloss_512r1024']
                 # 'experiments/gta5pcity_ambulance_alpha1wts0p5awts1e-4_affineloss']
     for network in networks:
         for content in tqdm(content_dirs):
@@ -406,10 +360,10 @@ if __name__ == '__main__':
                                  # vgg_pretrain='/data/Projects/pytorch-AdaIN/experiments/gta5pcity_ambulance_alpha1wts1_upVGG/vgg_iter_160000.pth.tar',
                                  # decoder_pretrain="/data/Projects/pytorch-AdaIN/experiments/gta5pcity_ambulance_alpha1wts1/decoder_iter_160000.pth.tar",
                                  # decoder_pretrain='/data/Projects/pytorch-AdaIN/models/decoder_.pth',
-                                 decoder_pretrain='/data/Projects/pytorch-AdaIN/{}/decoder_iter_2000.pth.tar'.format(network),
+                                 decoder_pretrain='/data/Projects/pytorch-AdaIN/{}/decoder_iter_57000.pth.tar'.format(network),
                                  vgg=vgg,decoder=decoder,do_interpolation=True,
-                                 content_size=(1024,2048), style_size=(1024,2048), crop=None, save_ext="png",
+                                 content_size=(1280,2560), style_size=(1280,2560), crop=None, save_ext="png",
                                  # output_path='/data/Projects/MaxSquareLoss/output/style_out',
-                                 output_path='/data/result/{}'.format('cut'),
+                                 output_path='/data/Projects/ADVENT/data/Cityscapes/leftImg8bit/val/frankfurt',
                                  preserve_color=None, alpha=1.0,
                                  style_interpolation_weight=style_interpolation_weight)
