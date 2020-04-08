@@ -114,8 +114,6 @@ class UDATrainer(Trainer):
         self.dataloader.valid_iterations = (len(self.target_dataset_val) + self.args.batch_size) // self.args.batch_size
 
         self.network = Net()
-        # if self.cuda:
-        #     self.network.cuda()
         self.network.train()
 
         ## define target loss
@@ -142,12 +140,11 @@ class UDATrainer(Trainer):
 
         ## initially add network parameters into
 
-        self.adain_optimizer = torch.optim.Adam(
-                self.network.parameters(),
-                lr=self.args.adain_lr)
+        # self.adain_optimizer = torch.optim.Adam(self.network.parameters(),
+        #                         lr=self.args.adain_lr)
 
         self.optimizer.zero_grad()
-        self.adain_optimizer.zero_grad()
+        # self.adain_optimizer.zero_grad()
 
     def save_tensor_as_Image(self, tensor, path, filename, cnt=0, nrow=8, padding=2,
                normalize=False, range=None, scale_each=False, pad_value=0):
@@ -159,7 +156,6 @@ class UDATrainer(Trainer):
         image = tensor.cpu().clone()
         grid = make_grid(image, nrow=nrow, padding=padding, pad_value=pad_value,
                          normalize=normalize, range=range, scale_each=scale_each)
-        # print('grid.max(),x.min(),x.shape,x[0,0]', grid.max(), grid.min(), grid.shape, grid[0, 0,])
         # Add 0.5 after unnormalizing to [0, 255] to round to nearest integer
         ndarr = grid.mul_(255).add_(0.5).clamp_(0, 255).permute(1, 2, 0).to('cpu', torch.uint8).numpy()
         # print('ndarr.max(),x.min(),x.shape,x[0,0]', ndarr.max(), ndarr.min(), ndarr.shape, ndarr[0, 0, 0])
@@ -291,6 +287,35 @@ class UDATrainer(Trainer):
         result = self.catT(trans_results[0], trans_results[1], trans_results[2], trans_results[3])
         return result.unsqueeze(0)
 
+    def train_classifier(self,source_feat,target_feat):
+        pass
+        # from graphs.models.resnet import resnet18
+        # self.classifier = resnet18().to('cuda:3')
+        # classifier_optimizer = torch.optim.SGD(self.classifier.parameters(),
+        #                                        lr=1e-3,momentum=0.9,
+        #                                        weight_decay=1e-6)
+        # classifier_lrsche = torch.optim.lr_scheduler.
+        #
+        # print(source_feat.shape,target_feat.shape)
+        # source_feat = F.interpolate(source_feat,(256,512))
+        # target_feat = F.interpolate(target_feat,(256,512))
+        # pred_source = self.classifier(source_feat)
+        # pred_target = self.classifier(target_feat)
+        #
+        # pred = torch.nn.Softmax(1)(pred)
+        #
+        # loss = self.criterion(pred, label)
+        #
+        # self.optimizer.zero_grad()
+        # loss.backward()
+        # self.optimizer.step()
+        #
+        # loss_epoch += loss.item()
+        # # break
+        #
+        # self.scheduler.step(loss_epoch)
+
+
 
     def train_one_epoch(self,epoch=0):
         tqdm_epoch = tqdm(zip(self.source_dataloader, self.target_dataloader),#, self.source_dataloader_trans),
@@ -314,36 +339,35 @@ class UDATrainer(Trainer):
         self.style_loss_weight = 1
         for batch_s, batch_t in tqdm_epoch:
             # self.poly_lr_scheduler(optimizer=self.optimizer, init_lr=self.args.lr)
-            self.adain_lr_scheduler(optimizer=self.adain_optimizer,
-                                    iteration_count=self.current_iter,lr = args.adain_lr)
+            # self.adain_lr_scheduler(optimizer=self.adain_optimizer,
+            #                         iteration_count=self.current_iter,lr = args.adain_lr)
 
             ############################################
             # get source and target picture from ADAIN #
             ############################################
             ## source ##
             content, source_label_tf, source_id = batch_s
-            trans_source = self.network(content,self.batch_style)
-            # self.save_tensor_as_Image(trans_source, path='/data/result/', filename='317.png', cnt=0)
+            with torch.no_grad():
+                trans_source = self.network(content,self.batch_style)
 
             ## target
             content, _, target_id = batch_t
-            trans_target = self.network(content,self.batch_style)
-            # self.save_tensor_as_Image(trans_target, path='/data/result/', filename='317.png', cnt=0)
+            with torch.no_grad():
+                trans_target = self.network(content,self.batch_style)
 
             ##########################
             # source supervised loss #
             ##########################
+            # transform pic as two-stage and resize label
             trans_source_tensor = self.seg_transform(trans_source)
             if self.args.seg_size != self.args.base_size:
                 import torch.nn.functional as F
                 source_label_tf = F.interpolate(source_label_tf.unsqueeze(0), size=[self.args.seg_size[1], self.args.seg_size[0]]).squeeze(0)
 
-
             if self.cuda:
                 x, y = Variable(trans_source_tensor).to('cuda:0'), \
                        Variable(source_label_tf).to(device='cuda:0', dtype=torch.long)
 
-            # print('x.device',x.device,x.shape,y.shape)
             pred = self.model(x)
             self.train_source(pred, y)
 
@@ -362,8 +386,9 @@ class UDATrainer(Trainer):
             self.optimizer.step()
             self.optimizer.zero_grad()
 
-            self.adain_optimizer.step()
-            self.adain_optimizer.zero_grad()
+
+            # self.adain_optimizer.step()
+            # self.adain_optimizer.zero_grad()
 
             self.current_iter += 1
             # if self.current_iter == 1:
@@ -385,7 +410,7 @@ class UDATrainer(Trainer):
         tqdm_epoch.close()
 
         # eval on source domain
-        # self.validate_source()
+        self.validate_source()
 
 
 def add_UDA_train_args(arg_parser):
