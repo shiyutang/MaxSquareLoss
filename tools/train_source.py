@@ -198,7 +198,6 @@ class Trainer():
 
     def train(self):
         # self.validate() # check image summary
-
         for epoch in tqdm(range(self.current_epoch, self.epoch_num),
                           desc="Total {} epochs".format(self.epoch_num)):
             self.train_one_epoch(epoch)
@@ -362,7 +361,7 @@ class Trainer():
         # print('tensor.shape',tensor.shape)
         d = torch.Tensor([122.67891434, 116.66876762,104.00698793]).reshape(-1, 1, 1).expand(-1, size[0], size[1])
         if torch.cuda.is_available():
-            d = d.to('cuda:3')
+            d = d.to('cuda:1')
         trans_source_tensor = trans_source_tensor.squeeze(0) - d
         r = trans_source_tensor[0, :, :]
         g = trans_source_tensor[1, :, :]
@@ -370,6 +369,41 @@ class Trainer():
         trans_source_tensor = torch.stack([b, g, r], dim=0).unsqueeze(0)
 
         return trans_source_tensor
+
+    def rectification(self, maxpred, argpred, id, x0, y0):
+        #### crop & resize then Transfer ###
+        ## x_org torch.Size([1, 3, 928, 1856])
+        x_crop = self.x_org[:, :, y0:int(y0+0.5*self.x_height), x0:int(x0+0.5*self.x_width)]
+        x_crop = F.interpolate(x_crop, size=[self.x_height, self.x_width])
+        x_new = self.network(x_crop, self.batch_style)
+        # self.save_tensor_as_Image(x, '/data/result', 'x_928r1856_trans_{}.png'.format(id)) ## save transfer result
+
+        ### segmentation ####
+        x_new  = self.seg_transform(x_new) # x is 1,3,640,1280
+        if self.cuda:
+            x_new = x_new.to('cuda:0')
+        new_pred = self.model(x_new)  ## pred 1,19,640,1280
+        if isinstance(new_pred, tuple):
+            new_pred = new_pred[0]
+
+        ### process the segmentation result of small map ##
+        new_pred = F.interpolate(new_pred, size=[int(0.5 * self.args.seg_size[1]), int(0.5 * self.args.seg_size[0])])
+        new_pred = new_pred.data.cpu().numpy() # (1, 19, 320, 640)
+        new_argpred = np.argmax(new_pred, axis=1) # 1,320,640
+        new_maxpred = np.amax(new_pred, axis=1)
+        # maxpred.shape  (1, 640, 1280)
+
+        segy0,segx0 = int((y0/self.x_height)*self.args.seg_size[1]),int((x0/self.x_width)*self.args.seg_size[0]) ## new coords in segmap
+        mask = new_maxpred > maxpred[0,segy0:int(segy0+0.5*self.args.seg_size[1]),segx0:int(segx0+0.5*self.args.seg_size[0])] # (1, 320, 640)
+        argpred[:,segy0:int(segy0+0.5*self.args.seg_size[1]),segx0:int(segx0+0.5*self.args.seg_size[0])][mask] = new_argpred[mask] ## argpred(1, 640, 1280) indexed(320, 640)
+
+        ##
+        images_inv = inv_preprocess(x_new.clone().cpu(), 1, numpy_transform=self.args.numpy_transform)
+        preds_colors_new = decode_labels(new_argpred, 1)
+        self.writer.add_image('{}/pred_new'.format(id), preds_colors_new, self.current_epoch)
+        self.writer.add_image('{}/transimg_after'.format(id), images_inv, self.current_epoch)
+
+        return argpred
 
     def validate(self, mode='val'):
         self.logger.info('\nvalidating one epoch...')
@@ -379,25 +413,56 @@ class Trainer():
                               desc="Val Epoch-{}-".format(self.current_epoch + 1))
             if mode == 'val':
                 self.model.eval()
-            for x, y, id in tqdm_batch:
-                x = self.network(x,self.batch_style)
-                x = self.seg_transform(x)
+            for x_org, y, id in tqdm_batch:
+                self.x_org = x_org
+                _, __, self.x_height, self.x_width = x_org.shape
+
+                x = self.network(x_org, self.batch_style)
+
+                ## prepare for segmentation ###
+                x = self.seg_transform(x) # (1,3,640,1280)
                 if self.args.seg_size != self.args.base_size:
                     y = F.interpolate(y.unsqueeze(0), size=[self.args.seg_size[1], self.args.seg_size[0]]).squeeze(0)
-
                 if self.cuda:
                     x, y = x.to('cuda:0'), y.to(device='cuda:0', dtype=torch.long)
-                # model
-                pred = self.model(x)                   
+
+                ### segmentation and prediction ###
+                pred = self.model(x)
                 if isinstance(pred, tuple):
-                    pred_2 = pred[1]
                     pred = pred[0]
                 y = torch.squeeze(y, 1)
+                label = y.cpu().numpy()
 
                 pred = pred.data.cpu().numpy()
-                label = y.cpu().numpy()
+                maxpred =np.amax(pred, axis=1)
                 argpred = np.argmax(pred, axis=1)
 
+                if self.args.rectification:
+                    ### start rectify and show result ###
+                    ## parameters
+                    y0 = random.randint(int(0.083 * self.x_height), int(0.25 * self.x_height))
+                    x0 = int(0.5 * self.x_width)
+                    segy0, segx0 = int((y0 / self.x_height) * self.args.seg_size[1]), int(
+                        (x0 / self.x_width) * self.args.seg_size[0])
+
+                    # prediction before rectification
+                    preds_colors_bs = decode_labels(argpred[:,segy0:int(segy0+0.5*self.args.seg_size[1]),segx0:int(segx0+0.5*self.args.seg_size[0])],1)
+                    self.writer.add_image('{}/pred_before'.format(id.item()), preds_colors_bs, self.current_epoch)
+
+                    argpred = self.rectification(maxpred, argpred, id.item(), 0, y0)
+                    argpred = self.rectification(maxpred, argpred,id.item(), x0, y0)
+
+                    preds_colors_after = decode_labels(argpred[:,segy0:int(segy0+0.5*self.args.seg_size[1]),segx0:int(segx0+0.5*self.args.seg_size[0])],1)
+                    self.writer.add_image('{}/pred_after'.format(id.item()), preds_colors_after, self.current_epoch)
+
+                    images_inv_bf = inv_preprocess(
+                        x[:, :, segy0:int(segy0+0.5*self.args.seg_size[1]),segx0:int(segx0+0.5*self.args.seg_size[0])].clone().cpu(), 1,
+                        numpy_transform=self.args.numpy_transform) #([1, 3, 464, 352]
+                    print('images_inv_bf.shape',images_inv_bf.shape)
+                    self.writer.add_image('{}/transimg_before'.format(id.item()), images_inv_bf, self.current_epoch)
+
+                    labels_colors = decode_labels(label[:, segy0:int(segy0+0.5*self.args.seg_size[1]), segx0:int(segx0+0.5*self.args.seg_size[0])], 1)
+                    self.writer.add_image('{}/label'.format(id.item()), labels_colors, self.current_epoch) # label # (1, 640, 1280)
                 self.Eval.add_batch(label, argpred)
 
             #show val result on tensorboard
@@ -571,8 +636,8 @@ class Trainer():
             'optimizer': self.optimizer.state_dict(),
             'best_MIou':self.best_MIou
         }
-        if self.network:
-            state['network'] = netdict,
+        # if self.network:
+        #     state['network'] = netdict,
         torch.save(state, filename)
 
     def load_checkpoint(self, filename):
@@ -587,15 +652,7 @@ class Trainer():
                 print('state_dict in checkpoint')
                 self.model.load_state_dict(checkpoint['state_dict'])
             else:
-                self.model.module.load_state_dict(checkpoint)
-                # # create new OrderedDict that does not contain `module.`
-                # from collections import OrderedDict
-                # new_state_dict = OrderedDict()
-                # for k, v in checkpoint.items():
-                #     name = k[7:]  # remove `module.`
-                #     new_state_dict[name] = v
-                # # load params
-                # self.model.load_state_dict(new_state_dict)
+                self.model.module.load_state_dict(checkpoint['state_dict'])
 
             self.logger.info("Checkpoint loaded successfully from "+filename)
 
@@ -635,9 +692,11 @@ def add_train_args(arg_parser):
                             help="the root path of dataset")
     arg_parser.add_argument('--list_path', type=str, default=None,
                             help="the root path of dataset")
-    arg_parser.add_argument('--checkpoint_dir', default="./log/train/trans_gta5_pretrain_add_multi/IW_MS_trans_plateau/gta52cityscapes_IW_maxsquaremIOUbest_epoch_25.pth",
+    arg_parser.add_argument('--checkpoint_dir',
+                            default=#'/data/Projects/MaxSquareLoss/log/train/trans_gta5_pretrain_add_multi/IW_MS_UNION_upseg_1832_strain_1e-3_add_multi/GTA52Cityscapes_IW_maxsquarebest.pth',
+    "./log/train/trans_gta5_pretrain_add_multi/IW_MS_trans_plateau/gta52cityscapes_IW_maxsquaremIOUbest_epoch_25.pth",
                             help="the path of ckpt file")
-    arg_parser.add_argument("--save_dir",default="./log/train/trans_gta5_pretrain_add_multi/IW_MS_UNION_seg_trans_test_add_multi/",
+    arg_parser.add_argument("--save_dir",default="./log/train/trans_gta5_pretrain_add_multi/IW_MS_UNION_seg1216_trans_classifier_add_multi/",
                             help="the path that you want to save all the output")
     arg_parser.add_argument("--restore_id",type=str, default="add_multi",
                             help="the id that help find load model")
@@ -669,15 +728,15 @@ def add_train_args(arg_parser):
     # dataset related arguments
     arg_parser.add_argument('--dataset', default='cityscapes', type=str,
                             help='dataset choice')
-    arg_parser.add_argument('--base_size', default="1856,928", type=str, # for random crop
+    arg_parser.add_argument('--base_size', default="1843,922", type=str, # for random crop
                             help='crop size of image')
-    arg_parser.add_argument('--crop_size', default="1856,928", type=str,
+    arg_parser.add_argument('--crop_size', default="1843,922", type=str,
                             help='base size of image')
     arg_parser.add_argument('--target_base_size', default="1843,922", type=str, # for random crop
                             help='crop size of target image')
     arg_parser.add_argument('--target_crop_size', default="1843,922", type=str,
                             help='base size of target image')
-    arg_parser.add_argument('--seg_size', default=(1280,640),
+    arg_parser.add_argument('--seg_size', default=(1216,576),
                             help='the size input to segmentation network')
     arg_parser.add_argument('--num_classes', default=19, type=int,
                             help='num class of mask')
@@ -715,6 +774,8 @@ def add_train_args(arg_parser):
                             help="the early stop step")
     arg_parser.add_argument('--poly_power', type=float, default=0.95,
                             help="poly_power")
+    arg_parser.add_argument('--rectification', type=bool, default=False,
+                            help='if rectify the final result')
 
     # multi-level output
 

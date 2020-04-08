@@ -36,39 +36,6 @@ def adaptive_instance_normalization(content_feat, style_feat):
         size)) / content_std.expand(size)
     return normalized_feat * style_std.expand(size) + style_mean.expand(size)
 
-
-decoder = nn.Sequential(
-    nn.ReflectionPad2d((1, 1, 1, 1)), #0
-    nn.Conv2d(512, 256, (3, 3)),
-    nn.ReLU(),
-    nn.Upsample(scale_factor=2, mode='nearest'),#3
-    nn.ReflectionPad2d((1, 1, 1, 1)),
-    nn.Conv2d(256, 256, (3, 3)),
-    nn.ReLU(),                       #6
-    nn.ReflectionPad2d((1, 1, 1, 1)),
-    nn.Conv2d(256, 256, (3, 3)),
-    nn.ReLU(),                       #9
-    nn.ReflectionPad2d((1, 1, 1, 1)),
-    nn.Conv2d(256, 256, (3, 3)),
-    nn.ReLU(),                       #12
-    nn.ReflectionPad2d((1, 1, 1, 1)),
-    nn.Conv2d(256, 128, (3, 3)),
-    nn.ReLU(),
-    nn.Upsample(scale_factor=2, mode='nearest'), #16
-    nn.ReflectionPad2d((1, 1, 1, 1)),
-    nn.Conv2d(128, 128, (3, 3)),
-    nn.ReLU(),                        #19
-    nn.ReflectionPad2d((1, 1, 1, 1)),
-    nn.Conv2d(128, 64, (3, 3)),
-    nn.ReLU(),
-    nn.Upsample(scale_factor=2, mode='nearest'), #23
-    nn.ReflectionPad2d((1, 1, 1, 1)),
-    nn.Conv2d(64, 64, (3, 3)),
-    nn.ReLU(),                                 #26
-    nn.ReflectionPad2d((1, 1, 1, 1)),
-    nn.Conv2d(64, 3, (3, 3)),                   #28
-)
-
 vgg = nn.Sequential(
     nn.Conv2d(3, 3, (1, 1)),
     nn.ReflectionPad2d((1, 1, 1, 1)),
@@ -126,27 +93,64 @@ vgg = nn.Sequential(
 )
 
 
+decoder = nn.Sequential(
+    nn.ReflectionPad2d((1, 1, 1, 1)), #0
+    nn.Conv2d(512, 256, (3, 3)),
+    nn.ReLU(),
+    nn.Upsample(scale_factor=2, mode='nearest'),#3
+    nn.ReflectionPad2d((1, 1, 1, 1)),
+    nn.Conv2d(256, 256, (3, 3)),
+    nn.ReLU(),                       #6
+    nn.ReflectionPad2d((1, 1, 1, 1)),
+    nn.Conv2d(256, 256, (3, 3)),
+    nn.ReLU(),                       #9
+    nn.ReflectionPad2d((1, 1, 1, 1)),
+    nn.Conv2d(256, 256, (3, 3)),
+    nn.ReLU(),                       #12
+    nn.ReflectionPad2d((1, 1, 1, 1)),
+    nn.Conv2d(256, 128, (3, 3)),     #14
+    nn.ReLU(),
+    nn.Upsample(scale_factor=2, mode='nearest'), #16
+    nn.ReflectionPad2d((1, 1, 1, 1)),
+    nn.Conv2d(128, 128, (3, 3)),
+    nn.ReLU(),                        #19
+    nn.ReflectionPad2d((1, 1, 1, 1)),
+    nn.Conv2d(128, 64, (3, 3)),
+    nn.ReLU(),
+    nn.Upsample(scale_factor=2, mode='nearest'), #23
+    nn.ReflectionPad2d((1, 1, 1, 1)),
+    nn.Conv2d(64, 64, (3, 3)),
+    nn.ReLU(),                                 #26
+    nn.ReflectionPad2d((1, 1, 1, 1)),
+    nn.Conv2d(64, 3, (3, 3)),                   #28
+)
+
+
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
         vgg.load_state_dict(torch.load("/data/Projects/pytorch-AdaIN/models/vgg_normalised.pth"))
         enc_layers = list(vgg.children())
-        self.enc_1 = nn.Sequential(*enc_layers[:4])  # input -> relu1_1
-        self.enc_2 = nn.Sequential(*enc_layers[4:11])  # relu1_1 -> relu2_1
-        self.enc_3 = nn.Sequential(*enc_layers[11:18])  # relu2_1 -> relu3_1
-        self.enc_4 = nn.Sequential(*enc_layers[18:31])  # relu3_1 -> relu4_1
+        self.enc_1 = nn.Sequential(*enc_layers[:4])#.to('cuda:2')  # input -> relu1_1
+        self.enc_2 = nn.Sequential(*enc_layers[4:11])#.to('cuda:2')  # relu1_1 -> relu2_1
+        self.enc_3 = nn.Sequential(*enc_layers[11:18])#.to('cuda:2')  # relu2_1 -> relu3_1
+        self.enc_4 = nn.Sequential(*enc_layers[18:31])#.to('cuda:1')  # relu3_1 -> relu4_1
         self.encoder = nn.Sequential(*list(vgg.children())[:31]).to('cuda:2')
 
-        pretrained_decoder = 'gta5pcity_ambulance_alpha1wts1awts1e-3_affineloss_pretrain11/decoder_iter_57000.pth.tar'
+        pretrained_decoder = 'gta5pcity_ambulance_alpha1wts1/decoder_iter_160000.pth.tar'
         decoder.load_state_dict(
                 torch.load('/data/Projects/pytorch-AdaIN/experiments/{}'.format(pretrained_decoder)))
         print('###################################')
         print('the decoder is from {}'.format(pretrained_decoder))
         dec_layers = list(decoder.children())
-        self.dec_1 = nn.Sequential(*dec_layers[:10]).to('cuda:2')
-        self.dec_4 = nn.Sequential(*dec_layers[10:24]).to('cuda:1')
-        self.dec_7 = nn.Sequential(*dec_layers[24:]).to('cuda:3')
 
+        # self.dec_1 = nn.Sequential(*dec_layers[:6]).to('cuda:1')
+        # self.dec_2 = nn.Sequential(*dec_layers[6:13]).to('cuda:4')
+        # self.dec_4 = nn.Sequential(*dec_layers[13:20]).to('cuda:5')
+        # self.dec_5 = nn.Sequential(*dec_layers[19:25]).to('cuda:6')
+        # self.dec_6 = nn.Sequential(*dec_layers[25:27]).to('cuda:7')
+        # self.dec_7 = nn.Sequential(*dec_layers[27:]).to('cuda:3')
+        self.decoder = decoder.to("cuda:1")
         self.mse_loss = nn.MSELoss()
 
         # fix the encoder
@@ -162,12 +166,6 @@ class Net(nn.Module):
             results.append(func(results[-1]))
         return results[1:]
 
-    # extract relu4_1 from input image
-    def encode(self, input):
-        for i in range(4):
-            input = getattr(self, 'enc_{:d}'.format(i + 1))(input)
-        return input
-
     def calc_content_loss(self, input, target):
         assert (input.size() == target.size())
         assert (target.requires_grad is False)
@@ -180,7 +178,6 @@ class Net(nn.Module):
         target_mean, target_std = calc_mean_std(target)
         return self.mse_loss(input_mean, target_mean) + \
                self.mse_loss(input_std, target_std)
-
 
     def forward_with_losses(self, content, batch_style, alpha=1.0,
                         weights=(1,1,1,1)):
@@ -238,8 +235,103 @@ class Net(nn.Module):
             content = content.to('cuda:2')
         interpolation_weights = [i / sum(weights) for i in weights]
 
+        # content_f = self.enc_4(self.enc_3(self.enc_2(self.enc_1(content))).to('cuda:1'))
+        # style_f = self.enc_4(self.enc_3(self.enc_2(self.enc_1(content))).to('cuda:1'))
         content_f = self.encoder(content)
+        torch.cuda.empty_cache()
         style_f = self.encoder(batch_style)
+
+        _, C, H, W = content_f.size()
+        feat = torch.FloatTensor(1, C, H, W).zero_()
+        if torch.cuda.is_available():
+            feat = feat.to('cuda:2')
+        base_feat = adaptive_instance_normalization(content_f,style_f)
+        for i, w in enumerate(interpolation_weights):
+            feat = feat + w * base_feat[i:i + 1]
+
+        t = alpha * feat + (1 - alpha) * content_f[0:1]
+
+        # g_t1 = self.dec_1(t.to('cuda:1'))
+        # g_t2 = self.dec_2(g_t1.to('cuda:4'))
+        # g_t4 = self.dec_4(g_t2.to('cuda:5'))
+        # g_t5 = self.dec_5(g_t4.to('cuda:6'))
+        # g_t6 = self.dec_6(g_t5.to('cuda:7'))
+        # g_t7 = self.dec_7(g_t6.to('cuda:3'))
+        g_t7 = self.decoder(t.to('cuda:1'))
+
+
+        return  g_t7
+
+
+class STNet_refer(nn.Module):
+    def __init__(self):
+        super(STNet_refer, self).__init__()
+        vgg.load_state_dict(torch.load("/data/Projects/pytorch-AdaIN/models/vgg_normalised.pth"))
+        enc_layers = list(vgg.children())
+        self.enc_1 = nn.Sequential(*enc_layers[:4]).to('cuda:2')  # input -> relu1_1
+        self.enc_2 = nn.Sequential(*enc_layers[4:11]).to('cuda:2')  # relu1_1 -> relu2_1
+        self.enc_3 = nn.Sequential(*enc_layers[11:30]).to('cuda:2')  # relu2_1 -> relu3_1
+        self.enc_4 = nn.Sequential(*enc_layers[30:31]).to('cuda:2')  # relu3_1 -> relu4_1
+        self.encoder = nn.Sequential(*list(vgg.children())[:31])
+
+        # pretrained_decoder = 'gta5pcity_ambulance_alpha1wts1awts1e-3_affineloss_pretrain11/decoder_iter_57000.pth.tar'
+        pretrained_decoder = 'gta5pcity_ambulance_alpha1wts1/decoder_iter_160000.pth.tar'
+        # pretrained_decoder = 'gta5pcity_ambulance_alpha1wts0p5/decoder_iter_160000.pth.tar'
+        # pretrained_decoder = '/data/Projects/pytorch-AdaIN/experiments_stylewt5/decoder_iter_160000.pth.tar'
+        decoder.load_state_dict(
+                torch.load('/data/Projects/pytorch-AdaIN/experiments/{}'.format(pretrained_decoder)))
+        print('###################################')
+        print('the decoder is from {}'.format(pretrained_decoder))
+        dec_layers = list(decoder.children())
+        self.dec_1 = nn.Sequential(*dec_layers[:10]).to('cuda:1')
+        self.dec_4 = nn.Sequential(*dec_layers[10:24]).to('cuda:1')
+        self.dec_7 = nn.Sequential(*dec_layers[24:]).to('cuda:1')
+
+        self.mse_loss = nn.MSELoss()
+
+        # fix the encoder
+        for name in ['enc_1', 'enc_2', 'enc_3', 'enc_4','dec_1','dec_4','dec_7']:
+            for param in getattr(self, name).parameters():
+                param.requires_grad = False
+
+    # extract relu1_1, relu2_1, relu3_1, relu4_1 from input image
+    def encode_with_intermediate(self, input):
+        results = [input]
+        for i in range(4):
+            func = getattr(self, 'enc_{:d}'.format(i + 1))
+            results.append(func(results[-1]))
+        return results[1:]
+
+    def calc_content_loss(self, input, target):
+        assert (input.size() == target.size())
+        assert (target.requires_grad is False)
+        return self.mse_loss(input, target)
+
+    def calc_style_loss(self, input, target):
+        assert (input.size() == target.size())
+        assert (target.requires_grad is False)
+        input_mean, input_std = calc_mean_std(input)
+        target_mean, target_std = calc_mean_std(target)
+        return self.mse_loss(input_mean, target_mean) + \
+               self.mse_loss(input_std, target_std)
+
+    def forward(self, content, batch_style, alpha=1.0,
+                        weights=(1,1,1,1),save_path = None):
+        assert 0 <= alpha <= 1
+        if torch.cuda.is_available():
+            batch_style = batch_style.to('cuda:2')
+
+        content = content.expand_as(batch_style)
+        if torch.cuda.is_available():
+            content = content.to('cuda:2')
+        interpolation_weights = [i / sum(weights) for i in weights]
+
+        content_f = self.enc_1(content)
+        content_f = self.enc_2(content_f)#.to('cuda:3'))
+        content_f = self.enc_3(content_f)
+        content_f = self.enc_4(content_f)
+        torch.cuda.empty_cache()
+        style_f = self.enc_4(self.enc_3(self.enc_2(self.enc_1(batch_style))))#.to('cuda:4'))
 
         _, C, H, W = content_f.size()
         feat = torch.FloatTensor(1, C, H, W).zero_()
@@ -251,12 +343,11 @@ class Net(nn.Module):
 
         t = alpha * feat+ (1 - alpha) * content_f[0:1]
 
-        g_t1 = self.dec_1(t)
+        g_t1 = self.dec_1(t.to('cuda:1'))
         g_t4 = self.dec_4(g_t1.to('cuda:1'))
-        g_t7 = self.dec_7(g_t4.to('cuda:3'))
+        g_t7 = self.dec_7(g_t4.to('cuda:1'))
 
         return  g_t7
-
 
 
 

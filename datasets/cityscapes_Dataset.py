@@ -125,7 +125,7 @@ class City_Dataset(data.Dataset):
 
     def __getitem__(self, item):
         id = self.items[item]
-        image_path = os.path.join(self.data_path,id)
+        image_path = os.path.join(self.data_path, id)
         image = Image.open(image_path).convert("RGB")
 
         gt_image_path = self.gt_path+id.replace("leftImg8bit","",1)\
