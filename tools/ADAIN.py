@@ -56,13 +56,12 @@ class UDATrainer(Trainer):
                                                split='val_style',
                                                base_size=args.base_size,
                                                crop_size=args.crop_size)
-        self.source_dataloader_val = data.DataLoader \
-            (self.source_dataset_val,
-             batch_size=self.args.batch_size,
-             shuffle=False,
-             num_workers=self.args.data_loader_workers,
-             pin_memory=self.args.pin_memory,
-             drop_last=True)
+        self.source_dataloader_val = data.DataLoader(self.source_dataset_val,
+                                                     batch_size=self.args.batch_size,
+                                                     shuffle=False,
+                                                     num_workers=self.args.data_loader_workers,
+                                                     pin_memory=self.args.pin_memory,
+                                                     drop_last=True)
 
         ## target dataset train and validation
         self.target_dataset_train = \

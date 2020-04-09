@@ -93,7 +93,7 @@ class GTA5dataset(data.Dataset):
             transforms.Resize(size),
             transforms.ToTensor()
         ]
-        return  transforms.Compose(transformlist)
+        return transforms.Compose(transformlist)
 
 
 def showimg(trainloader):
@@ -116,7 +116,6 @@ def showimg(trainloader):
     imshow(torchvision.utils.make_grid(images))
     # print labels
     print(' '.join('%5s' % classes[labels[j]] for j in range(4)))
-
 
 
 class Trainer():
