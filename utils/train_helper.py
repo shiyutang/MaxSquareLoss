@@ -10,7 +10,7 @@ def get_model(args):
     if args.backbone == "deeplabv2_multi":
         model = DeeplabMulti(num_classes=args.num_classes,
                             pretrained=args.imagenet_pretrained)
-        params = model.optim_parameters(args) #分类层是十倍的学习率，其他是正常学习率
+        params = model.optim_parameters(args) # 分类层是十倍的学习率，其他是正常学习率
         args.numpy_transform = True
     return model, params
 
@@ -137,9 +137,10 @@ class Net(nn.Module):
         self.enc_4 = nn.Sequential(*enc_layers[18:31])#.to('cuda:1')  # relu3_1 -> relu4_1
         self.encoder = nn.Sequential(*list(vgg.children())[:31]).to('cuda:2')
 
-        pretrained_decoder = 'gta5pcity_ambulance_alpha1wts1/decoder_iter_160000.pth.tar'
-        decoder.load_state_dict(
-                torch.load('/data/Projects/pytorch-AdaIN/experiments/{}'.format(pretrained_decoder)))
+        pretrained_decoder = '/data/Projects/pytorch-AdaIN/experiments/gta5pcity_ambulance_alpha1wts1/decoder_iter_160000.pth.tar'
+        # pretrained_decoder = '/data/Projects/pytorch-AdaIN/experiments/gta5pcity_ambulance_alpha1wts1awts1e-3_affineloss_pretrain11/decoder_iter_57000.pth.tar'
+
+        decoder.load_state_dict(torch.load(pretrained_decoder))
         print('###################################')
         print('the decoder is from {}'.format(pretrained_decoder))
         dec_layers = list(decoder.children())
@@ -180,7 +181,7 @@ class Net(nn.Module):
                self.mse_loss(input_std, target_std)
 
     def forward_with_losses(self, content, batch_style, alpha=1.0,
-                        weights=(1,1,1,1)):
+                            weights=(1,1,1,1)):
 
         assert 0 <= alpha <= 1
         if torch.cuda.is_available():
@@ -259,8 +260,7 @@ class Net(nn.Module):
         # g_t7 = self.dec_7(g_t6.to('cuda:3'))
         g_t7 = self.decoder(t.to('cuda:1'))
 
-
-        return  g_t7
+        return g_t7
 
 
 class STNet_refer(nn.Module):
@@ -275,11 +275,12 @@ class STNet_refer(nn.Module):
         self.encoder = nn.Sequential(*list(vgg.children())[:31])
 
         # pretrained_decoder = 'gta5pcity_ambulance_alpha1wts1awts1e-3_affineloss_pretrain11/decoder_iter_57000.pth.tar'
-        pretrained_decoder = 'gta5pcity_ambulance_alpha1wts1/decoder_iter_160000.pth.tar'
+        # pretrained_decoder = 'gta5pcity_ambulance_alpha1wts1/decoder_iter_160000.pth.tar'
         # pretrained_decoder = 'gta5pcity_ambulance_alpha1wts0p5/decoder_iter_160000.pth.tar'
         # pretrained_decoder = '/data/Projects/pytorch-AdaIN/experiments_stylewt5/decoder_iter_160000.pth.tar'
-        decoder.load_state_dict(
-                torch.load('/data/Projects/pytorch-AdaIN/experiments/{}'.format(pretrained_decoder)))
+        pretrained_decoder = '/data/Projects/MaxSquareLoss/experiments/gta5pcity_ambulance_alpha1wts1_classifier_512r1024/decoder_iter_99000.pth.tar'
+        decoder.load_state_dict(torch.load(pretrained_decoder))
+                # torch.load('/data/Projects/pytorch-AdaIN/experiments/{}'.format(pretrained_decoder)))
         print('###################################')
         print('the decoder is from {}'.format(pretrained_decoder))
         dec_layers = list(decoder.children())

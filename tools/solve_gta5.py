@@ -52,9 +52,7 @@ class UDATrainer(Trainer):
                                            data_root_path=args.source_data_path,
                                            list_path=args.source_list_path,
                                            gt_path=self.datasets_path['gta5']['gt_path'],
-                                           split=args.source_split,
-                                           base_size=args.base_size,
-                                           crop_size=args.crop_size)
+                                           split=args.source_split)
         self.source_dataloader = data.DataLoader(source_data_set,
                                                  batch_size=self.args.batch_size,
                                                  shuffle=True,
@@ -75,9 +73,7 @@ class UDATrainer(Trainer):
                                            data_root_path=args.source_data_path,
                                            list_path=args.source_list_path,
                                            gt_path=self.datasets_path['gta5']['gt_path'],
-                                           split='val',
-                                           base_size=args.base_size,
-                                           crop_size=args.crop_size)
+                                           split='val')
         self.source_val_dataloader = data.DataLoader(source_data_set,
                                                      batch_size=self.args.batch_size,
                                                      shuffle=False,
@@ -92,8 +88,6 @@ class UDATrainer(Trainer):
                                        list_path=self.datasets_path["cityscapes"]['list_path'],
                                        gt_path=self.datasets_path['cityscapes']['gt_path'],
                                        split=args.split,
-                                       base_size=args.target_base_size,
-                                       crop_size=args.target_crop_size,
                                        class_16=args.class_16)
         self.target_dataloader = data.DataLoader(target_data_set,
                                                  batch_size=self.args.batch_size,
@@ -106,8 +100,6 @@ class UDATrainer(Trainer):
                                        list_path=self.datasets_path["cityscapes"]['list_path'],
                                        gt_path=self.datasets_path['cityscapes']['gt_path'],
                                        split='val',
-                                       base_size=args.target_base_size,
-                                       crop_size=args.target_crop_size,
                                        class_16=args.class_16)
         self.target_val_dataloader = data.DataLoader(target_data_set,
                                                      batch_size=self.args.batch_size,
@@ -142,8 +134,6 @@ class UDATrainer(Trainer):
                           list_path=self.datasets_path[style]['list_path'],
                           gt_path=self.datasets_path[style]['gt_path'],
                           split=args.split,
-                          base_size=args.target_base_size,
-                          crop_size=args.target_crop_size,
                           class_16=args.class_16)
             self.aux_dataloader_target[style] = \
                 data.DataLoader(self.aux_dataset_target[style],
@@ -253,7 +243,7 @@ class UDATrainer(Trainer):
         # load pretrained checkpoint
         if self.args.pretrained_ckpt_file is not None:
             if os.path.isdir(self.args.pretrained_ckpt_file):
-                self.args.pretrained_ckpt_file = os.path.join(self.args.checkpoint_dir, self.restore_id + 'best.pth')
+                self.args.pretrained_ckpt_file = self.args.checkpoint_dir
             self.load_checkpoint(self.args.pretrained_ckpt_file)
 
         if not self.args.continue_training:
@@ -263,7 +253,7 @@ class UDATrainer(Trainer):
             self.current_epoch = 0
 
         if self.args.continue_training:
-            self.load_checkpoint(os.path.join(self.args.checkpoint_dir, self.restore_id + 'final.pth'))
+            self.load_checkpoint(self.args.checkpoint_dir)
             self.best_iter = self.current_iter  # the best iteration for target
             self.best_source_iter = self.current_iter  # the best iteration for source
 

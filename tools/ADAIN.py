@@ -1,61 +1,48 @@
 import os
-
 import sys
-from pathlib import Path
-import torch
-import torch.backends.cudnn as cudnn
-import torch.nn as nn
-from torchvision import transforms as ttransforms
-import torch.utils.data as data
-from PIL import Image
-from tensorboardX import SummaryWriter
-from tqdm import tqdm
-import numpy
 
+import torch.backends.cudnn as cudnn
+from PIL import Image
 
 sys.path.append(os.path.abspath('.'))
-from utils.train_helper import Net  ##
+from utils.train_helper import Net
 from utils.loss import *
-from datasets.cityscapes_Dataset import City_Dataset, City_DataLoader, inv_preprocess, decode_labels
 from datasets.gta5_Dataset import GTA5_Dataset, FlatFolderDataset
 from torch.optim import lr_scheduler
 
 from tools.train_source import *
 
-cudnn.benchmark = True # network speedup
+cudnn.benchmark = True  # network speedup
 # Disable DecompressionBombError
 Image.MAX_IMAGE_PIXELS = None
 
+
 class UDATrainer(Trainer):
-    def __init__(self, args, cuda=True, train_id="None", logger=None):
-        super().__init__(args, cuda, train_id, logger)  # 调用父类的初始化，这样不用重写函数，同时初始化了应有的参数
+    def __init__(self):
+        super().__init__(args, train_id, logger)  # 调用父类的初始化，这样不用重写函数，同时初始化了应有的参数
         self.scheduler = lr_scheduler.ReduceLROnPlateau(optimizer=self.optimizer,
                                                         mode='min', factor=0.9, patience=3, verbose=True)
 
-        ## source train loader
+        # source train loader
         self.source_dataset_train = GTA5_Dataset(args,
                                                  data_root_path=self.datasets_path["gta5"]['data_root_path'],
                                                  list_path=self.datasets_path['gta5']['list_path'],
                                                  gt_path=self.datasets_path['gta5']['gt_path'],
-                                                 split='train_style',
-                                                 base_size=args.base_size,
-                                                 crop_size=args.crop_size)
-        self.source_dataloader = \
-            data.DataLoader(self.source_dataset_train,
-                            batch_size=self.args.batch_size,
-                            shuffle=False,
-                            num_workers=self.args.data_loader_workers,
-                            pin_memory=self.args.pin_memory,
-                            drop_last=True)
+                                                 split='train_style')
+        self.source_dataloader = data.DataLoader(self.source_dataset_train,
+                                                 batch_size=self.args.batch_size,
+                                                 shuffle=False,
+                                                 num_workers=self.args.data_loader_workers,
+                                                 pin_memory=self.args.pin_memory,
+                                                 drop_last=True)
 
-        ## source validation loader
+        # source validation loader
         self.source_dataset_val = GTA5_Dataset(args,
                                                data_root_path=self.datasets_path['gta5']['data_root_path'],
                                                list_path=self.datasets_path['gta5']['list_path'],
                                                gt_path=self.datasets_path['gta5']['gt_path'],
-                                               split='val_style',
-                                               base_size=args.base_size,
-                                               crop_size=args.crop_size)
+                                               split='val_style')
+
         self.source_dataloader_val = data.DataLoader(self.source_dataset_val,
                                                      batch_size=self.args.batch_size,
                                                      shuffle=False,
@@ -64,30 +51,25 @@ class UDATrainer(Trainer):
                                                      drop_last=True)
 
         ## target dataset train and validation
-        self.target_dataset_train = \
-            City_Dataset(args,
-                         data_root_path=self.datasets_path['cityscapes']['data_root_path'],
-                         list_path=self.datasets_path['cityscapes']['list_path'],
-                         gt_path=self.datasets_path['cityscapes']['gt_path'],
-                         split='train_style',
-                         base_size=args.base_size,
-                         crop_size=args.crop_size,
-                         class_16=args.class_16)
-        self.target_dataloader = data.DataLoader \
-            (self.target_dataset_train,
-             batch_size=self.args.batch_size,
-             shuffle=True,
-             num_workers=self.args.data_loader_workers,
-             pin_memory=self.args.pin_memory,
-             drop_last=True)
+        self.target_dataset_train = City_Dataset(args,
+                                                 data_root_path=self.datasets_path['cityscapes']['data_root_path'],
+                                                 list_path=self.datasets_path['cityscapes']['list_path'],
+                                                 gt_path=self.datasets_path['cityscapes']['gt_path'],
+                                                 split='train_style',
+                                                 class_16=args.class_16)
+
+        self.target_dataloader = data.DataLoader(self.target_dataset_train,
+                                                 batch_size=self.args.batch_size,
+                                                 shuffle=True,
+                                                 num_workers=self.args.data_loader_workers,
+                                                 pin_memory=self.args.pin_memory,
+                                                 drop_last=True)
         self.target_dataset_val = \
             City_Dataset(args,
                          data_root_path=self.datasets_path['cityscapes']['data_root_path'],
                          list_path=self.datasets_path['cityscapes']['list_path'],
                          gt_path=self.datasets_path['cityscapes']['gt_path'],
                          split='val_style',
-                         base_size=args.base_size,
-                         crop_size=args.crop_size,
                          class_16=args.class_16)
 
         self.target_val_dataloader = data.DataLoader(self.target_dataset_val,
@@ -99,14 +81,12 @@ class UDATrainer(Trainer):
 
         style_dataset = FlatFolderDataset(
             root="/data/Projects/MaxSquareLoss/imagenet_style/ambulance",
-            transform=self.source_dataset_val.adain_transform(size=(self.args.base_size[0],self.args.base_size[1])))
+            transform=self.source_dataset_val.adain_transform(size=(self.args.base_size[0], self.args.base_size[1])))
 
-        self.style_dataloader=iter(data.DataLoader(style_dataset,
-                                                   batch_size=4,
-                                                   shuffle=False,
-                                                   num_workers=self.args.data_loader_workers,
-                                                   pin_memory=self.args.pin_memory,
-                                                   drop_last=True))
+        self.style_dataloader = iter(data.DataLoader(style_dataset, batch_size=4, shuffle=False,
+                                                     num_workers=self.args.data_loader_workers,
+                                                     pin_memory=self.args.pin_memory,
+                                                     drop_last=True))
 
         self.batch_style = next(self.style_dataloader)
         self.dataloader.val_loader = self.target_val_dataloader
@@ -141,15 +121,12 @@ class UDATrainer(Trainer):
 
         # self.adain_optimizer = torch.optim.Adam(self.network.parameters(),
         #                         lr=self.args.adain_lr)
-
-        self.optimizer.zero_grad()
         # self.adain_optimizer.zero_grad()
 
-    def save_tensor_as_Image(self, tensor, path, filename, cnt=0, nrow=8, padding=2,
-               normalize=False, range=None, scale_each=False, pad_value=0):
-        if not os.path.exists(path):
-            os.makedirs(path)
+        self.optimizer.zero_grad()
 
+    def save_tensor_as_Image(self, tensor, path, cnt=0, nrow=8, padding=2,
+                             normalize=False, range=None, scale_each=False, pad_value=0):
         from PIL import Image
         from utils.train_helper import make_grid
         image = tensor.cpu().clone()
@@ -159,11 +136,9 @@ class UDATrainer(Trainer):
         ndarr = grid.mul_(255).add_(0.5).clamp_(0, 255).permute(1, 2, 0).to('cpu', torch.uint8).numpy()
         # print('ndarr.max(),x.min(),x.shape,x[0,0]', ndarr.max(), ndarr.min(), ndarr.shape, ndarr[0, 0, 0])
         im = Image.fromarray(ndarr)
-        outpath = os.path.join(path,filename)
-        if cnt%10000 == 0:
-            im.save(outpath)
+        if cnt % 10000 == 0:
+            im.save(path, format='png')
         return im
-
 
     def train_target(self, pred):
         if isinstance(pred, tuple):
@@ -172,6 +147,7 @@ class UDATrainer(Trainer):
             pred_P_2 = F.softmax(pred_2, dim=1)
         pred_P = F.softmax(pred, dim=1)
 
+        ## hard or soft labels
         if self.args.target_mode == "hard":
             label = torch.argmax(pred_P.detach(), dim=1)
             if self.args.multi: label_2 = torch.argmax(pred_P_2.detach(), dim=1)
@@ -180,7 +156,8 @@ class UDATrainer(Trainer):
             if self.args.multi: label_2 = pred_P_2
 
         maxpred, argpred = torch.max(pred_P.detach(), dim=1)
-        if self.args.multi: maxpred_2, argpred_2 = torch.max(pred_P_2.detach(), dim=1)
+        if self.args.multi:
+            maxpred_2, argpred_2 = torch.max(pred_P_2.detach(), dim=1)
 
         if self.args.target_mode == "hard":
             mask = (maxpred > self.threshold)
@@ -206,7 +183,6 @@ class UDATrainer(Trainer):
 
         loss_target_.backward()
         self.loss_target_value += self.loss_target / self.iter_num
-
 
     def train_source(self, pred, y):
         if isinstance(pred, tuple):  # multi has 2 prediction
@@ -236,7 +212,7 @@ class UDATrainer(Trainer):
             self.current_iter = 0
             self.current_epoch = 0
         else:
-            self.load_checkpoint(os.path.join(self.args.checkpoint_dir, self.restore_id + 'final.pth'))
+            self.load_checkpoint(self.args.checkpoint_dir)
             self.best_iter = self.current_iter  # the best iteration for target
             self.best_source_iter = self.current_iter  # the best iteration for source
 
@@ -261,66 +237,19 @@ class UDATrainer(Trainer):
 
             self.current_round += 1
 
-    def cropT(self,tensor):
-        if len(tensor.shape) == 4:
-            tensor = tensor.squeeze(0)
-        c,h,w = tensor.shape
-        a1 = tensor[:,0:h//2, 0:w//2]
-        a2 = tensor[:,0:h//2, w//2:w]
-        a3 = tensor[:,h//2:h, 0:w//2]
-        a4 = tensor[:,h//2:h, w//2:w]
-        return a1,a2,a3,a4
+    def save_images(self, pred, label, image_tensor, name, epoch):
+        pred = decode_labels(pred, 1)
+        label = decode_labels(label, 1)
+        image_tensor = inv_preprocess(image_tensor, 1)
+        self.writer.add_image('{}/pred_{}'.format(epoch, name), pred, epoch)
+        self.writer.add_image('{}/label_{}'.format(epoch, name), label, epoch)
+        self.writer.add_image('{}/image_{}'.format(epoch, name), image_tensor, epoch)
 
-    def catT(self,a1,a2,a3,a4):
-        aup = torch.cat((a1,a2),dim=2)
-        adown = torch.cat((a3,a4),dim=2)
-        a = torch.cat((aup,adown),dim=1)
-        return a
-
-    def cropTrans(self,content):
-        contents = self.cropT(content)
-        trans_results = []
-        for c in contents:
-            ct = self.network(c.unsqueeze(0), self.batch_style)  # 输出正确
-            trans_results.append(ct.squeeze(0))
-        result = self.catT(trans_results[0], trans_results[1], trans_results[2], trans_results[3])
-        return result.unsqueeze(0)
-
-    def train_classifier(self,source_feat,target_feat):
-        pass
-        # from graphs.models.resnet import resnet18
-        # self.classifier = resnet18().to('cuda:3')
-        # classifier_optimizer = torch.optim.SGD(self.classifier.parameters(),
-        #                                        lr=1e-3,momentum=0.9,
-        #                                        weight_decay=1e-6)
-        # classifier_lrsche = torch.optim.lr_scheduler.
-        #
-        # print(source_feat.shape,target_feat.shape)
-        # source_feat = F.interpolate(source_feat,(256,512))
-        # target_feat = F.interpolate(target_feat,(256,512))
-        # pred_source = self.classifier(source_feat)
-        # pred_target = self.classifier(target_feat)
-        #
-        # pred = torch.nn.Softmax(1)(pred)
-        #
-        # loss = self.criterion(pred, label)
-        #
-        # self.optimizer.zero_grad()
-        # loss.backward()
-        # self.optimizer.step()
-        #
-        # loss_epoch += loss.item()
-        # # break
-        #
-        # self.scheduler.step(loss_epoch)
-
-
-
-    def train_one_epoch(self,epoch=0):
-        tqdm_epoch = tqdm(zip(self.source_dataloader, self.target_dataloader),#, self.source_dataloader_trans),
+    def train_one_epoch(self, epoch=0):
+        tqdm_epoch = tqdm(zip(self.source_dataloader, self.target_dataloader),  # , self.source_dataloader_trans),
                           total=self.dataloader.num_iterations,
                           desc="Train Round-{}-Epoch-{}-total-{}". \
-                          format(self.current_round,self.current_epoch + 1, self.epoch_num))
+                          format(self.current_round, self.current_epoch + 1, self.epoch_num))
         self.logger.info("Training one epoch... in the method defined by ADAIN")
         self.Eval.reset()
 
@@ -337,7 +266,6 @@ class UDATrainer(Trainer):
 
         self.style_loss_weight = 1
         for batch_s, batch_t in tqdm_epoch:
-            # self.poly_lr_scheduler(optimizer=self.optimizer, init_lr=self.args.lr)
             # self.adain_lr_scheduler(optimizer=self.adain_optimizer,
             #                         iteration_count=self.current_iter,lr = args.adain_lr)
 
@@ -347,21 +275,27 @@ class UDATrainer(Trainer):
             ## source ##
             content, source_label_tf, source_id = batch_s
             with torch.no_grad():
-                trans_source = self.network(content,self.batch_style)
+                if self.args.crop_trans:
+                    trans_source = self.cropTrans(content)
+                else:
+                    trans_source = self.network(content, self.batch_style)
 
             ## target
-            content, _, target_id = batch_t
+            content, target_label, target_id = batch_t
             with torch.no_grad():
-                trans_target = self.network(content,self.batch_style)
+                if self.args.crop_trans:
+                    trans_target = self.cropTrans(content)
+                else:
+                    trans_target = self.network(content, self.batch_style)
+            if self.current_iter == 0:
+                self.save_tensor_as_Image(trans_source, '/data/result/source_crop_trans.png')
+                self.save_tensor_as_Image(trans_target, '/data/result/target_crop_trans.png')
 
             ##########################
             # source supervised loss #
             ##########################
             # transform pic as two-stage and resize label
-            trans_source_tensor = self.seg_transform(trans_source)
-            if self.args.seg_size != self.args.base_size:
-                import torch.nn.functional as F
-                source_label_tf = F.interpolate(source_label_tf.unsqueeze(0), size=[self.args.seg_size[1], self.args.seg_size[0]]).squeeze(0)
+            trans_source_tensor, source_label_tf = self.seg_transform(trans_source, source_label_tf)
 
             if self.cuda:
                 x, y = Variable(trans_source_tensor).to('cuda:0'), \
@@ -369,22 +303,26 @@ class UDATrainer(Trainer):
 
             pred = self.model(x)
             self.train_source(pred, y)
+            if self.current_iter % self.dataloader.num_iterations == 0:
+                self.save_images(np.argmax(pred[0].cpu().detach(), axis=1), source_label_tf, trans_source,
+                                 'source_train', epoch)
 
             #####################
             # train with target #
             #####################
-            trans_target_tensor = self.seg_transform(trans_target)
+            trans_target_tensor, target_label = self.seg_transform(trans_target, target_label)
 
             if self.cuda:
                 x = Variable(trans_target_tensor).to('cuda:0')
 
             pred = self.model(x)
             self.train_target(pred)
-
+            if self.current_iter % self.dataloader.num_iterations == 0:
+                self.save_images(np.argmax(pred[0].cpu().detach(), axis=1), target_label, trans_target, 'target_train',
+                                 epoch)
 
             self.optimizer.step()
             self.optimizer.zero_grad()
-
 
             # self.adain_optimizer.step()
             # self.adain_optimizer.zero_grad()
@@ -397,7 +335,8 @@ class UDATrainer(Trainer):
         self.writer.add_scalar('train_loss', self.loss_seg_value, self.current_epoch)
         tqdm.write("The average loss of train epoch-{}-:{}".format(self.current_epoch, self.loss_seg_value))
         self.writer.add_scalar('target_loss', self.loss_target_value, self.current_epoch)
-        tqdm.write("The average target_loss of train epoch-{}-:{:.3f}".format(self.current_epoch, self.loss_target_value))
+        tqdm.write(
+            "The average target_loss of train epoch-{}-:{:.3f}".format(self.current_epoch, self.loss_target_value))
 
         if self.args.multi:
             self.writer.add_scalar('train_loss_2', self.loss_seg_value_2, self.current_epoch)
@@ -409,7 +348,39 @@ class UDATrainer(Trainer):
         tqdm_epoch.close()
 
         # eval on source domain
-        self.validate_source()
+        self.validate_source(epoch)
+
+    def cropT(self, tensor):
+        if len(tensor.shape) == 4:
+            tensor = tensor.squeeze(0)
+        c, h, w = tensor.shape
+        a1 = tensor[:, 0:h // 2, 0:w // 2]
+        a2 = tensor[:, 0:h // 2, w // 2:w]
+        a3 = tensor[:, h // 2:h, 0:w // 2]
+        a4 = tensor[:, h // 2:h, w // 2:w]
+        return a1, a2, a3, a4
+
+    def catT(self, a1, a2, a3, a4):
+        aup = torch.cat((a1, a2), dim=2)
+        adown = torch.cat((a3, a4), dim=2)
+        a = torch.cat((aup, adown), dim=1)
+        return a
+
+    def cropTrans(self, content):
+        contents = self.cropT(content)
+        trans_results = []
+        for c in contents:
+            assert c.shape[1:] == (self.args.crop_size[1], self.args.crop_size[0]), \
+                'the shape of croped pic is {} but should be crop_size'.format(c.shape[1:])
+            c = F.interpolate(c.unsqueeze(0), (self.args.base_size[1], self.args.base_size[0]))
+
+            assert len(c.shape) == 4, 'the dim of pic input to network need to be 4'
+            ct = self.network(c, self.batch_style)  # 输出正确
+
+            ct = F.interpolate(ct, (self.args.crop_size[1], self.args.crop_size[0]))
+            trans_results.append(ct.squeeze(0))
+        result = self.catT(trans_results[0], trans_results[1], trans_results[2], trans_results[3])
+        return result.unsqueeze(0)
 
 
 def add_UDA_train_args(arg_parser):
@@ -435,7 +406,7 @@ def add_UDA_train_args(arg_parser):
                             help='the ratio of image-wise weighting factor')
     arg_parser.add_argument('--threshold', type=float, default=0.95,
                             help="threshold for Self-produced guidance")
-    arg_parser.add_argument('--adain_lr',type=float, default=1e-4,
+    arg_parser.add_argument('--adain_lr', type=float, default=1e-4,
                             help='learning rate for adain')
     return arg_parser
 
@@ -452,6 +423,5 @@ if __name__ == '__main__':
 
     train_id = "GTA52Cityscapes_" + args.target_mode
 
-    agent = UDATrainer(args=args, train_id=train_id,
-                       logger=logger)
+    agent = UDATrainer()
     agent.main()

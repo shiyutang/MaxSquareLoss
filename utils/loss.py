@@ -81,8 +81,6 @@ class IW_MaxSquareloss(nn.Module):
         :return: maximum squares loss with image-wise weighting factor
         """
         # prob -= 0.5
-        N, C, H, W = prob.size()
-        mask = (prob != self.ignore_index)
         maxpred, argpred = torch.max(prob, 1)
         mask_arg = (maxpred != self.ignore_index)
         argpred = torch.where(mask_arg, argpred, torch.ones(1).to(prob.device, dtype=torch.long)*self.ignore_index)
@@ -91,16 +89,16 @@ class IW_MaxSquareloss(nn.Module):
         weights = []
         batch_size = prob.size(0)
         for i in range(batch_size):
-            hist = torch.histc(label[i].cpu().data.float(), 
-                            bins=self.num_class+1, min=-1,
-                            max=self.num_class-1).float()
+            hist = torch.histc(label[i].cpu().data.float(), bins=self.num_class+1,
+                               min=-1, max=self.num_class-1).float()
             hist = hist[1:]
-            weight = (1/torch.max(torch.pow(hist, self.ratio)*torch.pow(hist.sum(), 1-self.ratio), torch.ones(1))).to(argpred.device)[argpred[i]].detach()
+            weight = (1/torch.max(torch.pow(hist, self.ratio)*torch.pow(hist.sum(), 1-self.ratio), torch.ones(1))).\
+                        to(argpred.device)[argpred[i]].detach()
             weights.append(weight)
         weights = torch.stack(weights, dim=0)
         mask = mask_arg.unsqueeze(1).expand_as(prob)
-        prior = torch.mean(prob, (2,3), True).detach()
         loss = -torch.sum((torch.pow(prob, 2)*weights)[mask]) / (batch_size*self.num_class)
+
         return loss
 
 class MaxSquareloss(nn.Module):

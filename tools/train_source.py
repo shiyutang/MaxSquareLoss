@@ -24,14 +24,10 @@ from datasets.gta5_Dataset import GTA5_DataLoader
 from datasets.synthia_Dataset import SYNTHIA_DataLoader
 
 datasets_path={
-    'cityscapes': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes',
+    'Cityscapes': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes',
                    'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
                     'image_path':'/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
                     'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
-    'Cityscapes_accordion': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_accordion',
-                   'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
-                   'image_path': '/data/Projects/ADVENT/data/Cityscapes_accordion/leftImg8bit',
-                   'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
     'Cityscapes_ambulance_styleRetrain': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_styleRetrain',
                    'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
                    'image_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_styleRetrain/leftImg8bit',
@@ -60,21 +56,9 @@ datasets_path={
              'list_path': '/data/Projects/ADVENT/data/GTA5',
              'image_path':'/data/Projects/ADVENT/data/GTA5/images',
              'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
-    'GTA5_accordion': {'data_root_path': '/data/Projects/ADVENT/data/GTA5_accordion',
-                       'list_path': '/data/Projects/ADVENT/data/GTA5',
-                       'image_path':'/data/Projects/ADVENT/data/GTA5_accordion/images',
-                       'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
     'GTA5_ambulance_styleRetrain': {'data_root_path': '/data/Projects/ADVENT/data/GTA5_ambulance_styleRetrain',
                         'list_path': '/data/Projects/ADVENT/data/GTA5',
                        'image_path': '/data/Projects/ADVENT/data/GTA5_ambulance_styleRetrain/images',
-                       'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
-    'GTA5_church': {'data_root_path': '/data/Projects/ADVENT/data/GTA5_church',
-                       'list_path': '/data/Projects/ADVENT/data/GTA5',
-                       'image_path': '/data/Projects/ADVENT/data/GTA5_church/images',
-                       'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
-    'GTA5_elephant': {'data_root_path': '/data/Projects/ADVENT/data/GTA5_elephant',
-                       'list_path': '/data/Projects/ADVENT/data/GTA5',
-                       'image_path': '/data/Projects/ADVENT/data/GTA5_elephant/images',
                        'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
     'GTA5_ambulance_gta5pcity_retrain_alpha1stylewt1':
         {'data_root_path': '/data/Projects/ADVENT/data/GTA5_ambulance_gta5pcity_retrain_alpha1stylewt1',
@@ -91,7 +75,8 @@ datasets_path={
          'list_path': '/data/Projects/ADVENT/data/GTA5',
          'image_path': '/data/Projects/ADVENT/data/GTA5_cityscapes_standard/images',
          'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
-
+    'Client':{'list_path': '/data/Projects/ADVENT/data/Client',
+              'image_path': '/data/Projects/ADVENT/data/Client',},
     'synthia': {'data_root_path': '/data/Projects/ADVENT/data/SYNTHIA', 'list_path': '/data/Projects/ADVENT/data/SYNTHIA/list',
                     'image_path':'/data/Projects/ADVENT/data/SYNTHIA/RGB',
                     'gt_path': '/data/Projects/ADVENT/data/GT/LABELS'},
@@ -112,12 +97,11 @@ class Trainer():
     def __init__(self, args, cuda=None, train_id="None", logger=None):
         self.args = args
         self.datasets_path = datasets_path
-        if torch.cuda.device_count()==1:
+        if torch.cuda.device_count() == 1:
             os.environ["CUDA_VISIBLE_DEVICES"] = self.args.gpu # else 0,1,2,3
         self.cuda = cuda and torch.cuda.is_available()
         self.device = torch.device('cuda' if self.cuda else 'cpu')
         self.train_id = train_id
-        self.restore_id = args.restore_id
         self.logger = logger
 
         self.current_MIoU = 0
@@ -140,9 +124,6 @@ class Trainer():
 
         # model
         self.model, self.params = get_model(self.args)
-        # if torch.cuda.device_count()>1:
-        #     print("let us use {} GPUs".format(torch.cuda.device_count()))
-        #     self.model = nn.DataParallel(self.model,device_ids=[i for i in range(torch.cuda.device_count()//2,torch.cuda.device_count())])
         if torch.cuda.is_available():
             self.model = nn.DataParallel(self.model, device_ids=[0])
 
@@ -159,38 +140,32 @@ class Trainer():
             self.optimizer = torch.optim.Adam(self.params, betas=(0.9, 0.99), weight_decay=self.args.weight_decay)
 
         # dataloader
-        if self.args.dataset=="cityscapes" or 'Cityscapes' in self.args.dataset:
-            self.dataloader = City_DataLoader(self.args, datasets_path=datasets_path[self.args.dataset])
-        elif self.args.dataset=="gta5" or 'GTA5' in self.args.dataset:
-            self.dataloader = GTA5_DataLoader(self.args, datasets_path=datasets_path[self.args.dataset])
-        elif self.args.dataset=='synthia':
+        if self.args.dataset == 'Cityscapes':
+            self.dataloader = City_DataLoader(self.args, datasets_path=datasets_path)
+        elif self.args.dataset == "gta5" or 'GTA5' in self.args.dataset:
+            self.dataloader = GTA5_DataLoader(self.args, datasets_path=datasets_path)
+        elif self.args.dataset == 'synthia':
             self.dataloader = SYNTHIA_DataLoader(self.args,datasets_path['synthia'])
+
         self.dataloader.num_iterations = min(self.dataloader.num_iterations, ITER_MAX)
         print(self.args.iter_max, self.dataloader.num_iterations)
         self.epoch_num = ceil(self.args.iter_max / self.dataloader.num_iterations) if self.args.iter_stop is None else \
                             ceil(self.args.iter_stop / self.dataloader.num_iterations)
 
-        # self.logger.info('I am loading training data and validation data from {}'.\
-        #                  format(datasets_path[self.args.dataset]['data_root_path']))
-
     def main(self):
-        # display args details
-        # self.logger.info("Global configuration as follows:")
-        # for key, val in vars(self.args).items():
-        #     self.logger.info("{:16} {}".format(key, val))
-
-
         # load pretrained checkpoint
         if self.args.checkpoint_dir is not None:  # restore from trained GTA
-            self.args.pretrained_ckpt_file = os.path.join(self.args.checkpoint_dir, self.restore_id + 'best.pth')
-            self.load_checkpoint(self.args.pretrained_ckpt_file)
+            self.load_checkpoint(self.args.checkpoint_dir)
 
         if self.args.continue_training:
-            self.load_checkpoint(os.path.join(self.args.checkpoint_dir, self.restore_id + 'best.pth'))
+            self.load_checkpoint(self.args.checkpoint_dir)
             self.best_iter = self.current_iter         # the best iteration for target
             self.best_source_iter = self.current_iter  # the best iteration for source
         else:
             self.current_epoch = 0
+            self.best_iter = 0
+            self.best_source_iter = 0  # the best iteration for source
+
         # train
         self.train()
 
@@ -203,30 +178,34 @@ class Trainer():
             self.train_one_epoch(epoch)
 
             # validate
-            PA, MPA, MIoU, FWIoU = self.validate()
-            self.writer.add_scalar('PA', PA, self.current_epoch)
-            self.writer.add_scalar('MPA', MPA, self.current_epoch)
-            self.writer.add_scalar('MIoU', MIoU, self.current_epoch)
-            self.writer.add_scalar('FWIoU', FWIoU, self.current_epoch)
-
-            self.current_MIoU = MIoU
-            is_best = MIoU > self.best_MIou
-            if is_best:
-                self.best_MIou = MIoU
-                self.best_iter = self.current_iter
-                self.logger.info("=>saving a new best checkpoint...")
-                self.save_checkpoint(self.train_id+'best.pth')
+            if self.args.client:
+                self.validate_client()
             else:
-                self.logger.info("=> The MIoU of val does't improve.")
-                self.logger.info("=> The best MIoU of val is {} at {}".format(self.best_MIou, self.best_iter))
+                PA, MPA, MIoU, FWIoU = self.validate(epoch)
+                self.writer.add_scalar('PA', PA, self.current_epoch)
+                self.writer.add_scalar('MPA', MPA, self.current_epoch)
+                self.writer.add_scalar('MIoU', MIoU, self.current_epoch)
+                self.writer.add_scalar('FWIoU', FWIoU, self.current_epoch)
+
+                self.current_MIoU = MIoU
+                is_best = MIoU > self.best_MIou
+                if is_best:
+                    self.best_MIou = MIoU
+                    self.best_iter = self.current_iter
+                    self.logger.info("=>saving a new best checkpoint...")
+                    self.save_checkpoint(self.train_id+'best.pth')
+                else:
+                    self.logger.info("=> The MIoU of val does't improve.")
+                    self.logger.info("=> The best MIoU of val is {} at {}".format(self.best_MIou, self.best_iter))
             
             self.current_epoch += 1
 
-        self.logger.info("=>best_MIou {} at {}".format(self.best_MIou, self.best_iter))
-        self.logger.info("=>saving the final checkpoint to " + os.path.join(self.args.save_dir, self.train_id+'final.pth'))
+        if not self.args.client:
+            self.logger.info("=>best_MIou {} at {}".format(self.best_MIou, self.best_iter))
+            self.logger.info("=>saving the final checkpoint to " + os.path.join(self.args.save_dir, self.train_id+'final.pth'))
         self.save_checkpoint(self.train_id+'final.pth')
 
-    def train_one_epoch(self,epoch=None):
+    def train_one_epoch(self, epoch=None):
         tqdm_epoch = tqdm(self.dataloader.data_loader, total=self.dataloader.num_iterations,
                           desc="Train Epoch-{}-total-{}".format(self.current_epoch+1, self.epoch_num))
         self.logger.info("Training one epoch...")
@@ -245,27 +224,20 @@ class Trainer():
 
         batch_idx = 0
         for x, y, _ in tqdm_epoch:
-            self.poly_lr_scheduler(
-                optimizer=self.optimizer,
-                init_lr=self.args.lr,
-                iter=self.current_iter,
-                max_iter=self.args.iter_max,
-                power=self.args.poly_power,
-            )
-            if self.args.iter_stop is not None and self.current_iter >= self.args.iter_stop:
-                self.logger.info("iteration arrive {}(early stop)/{}(total step)!".format(self.args.iter_stop, self.args.iter_max))
-                break
-            if self.current_iter >= self.args.iter_max:
-                self.logger.info("iteration arrive {}!".format(self.args.iter_max))
-                break
+            self.poly_lr_scheduler(optimizer=self.optimizer, init_lr=self.args.lr,
+                                   iter=self.current_iter, max_iter=self.args.iter_max,
+                                   power=self.args.poly_power)
+
             self.writer.add_scalar('learning_rate', self.optimizer.param_groups[0]["lr"], self.current_iter)
 
             if self.cuda:
                 x, y = x.to(self.device), y.to(device=self.device, dtype=torch.long)
             y = torch.squeeze(y, 1)
-            self.optimizer.zero_grad()
 
             # model
+            if self.args.client:
+                assert x.shape[2:] == (self.args.seg_size[1], self.args.seg_size[0]), \
+                    'segsize is {} but x shape is {}'.format(self.args.seg_size, x.shape[2:])
             pred = self.model(x)
             if isinstance(pred, tuple):
                 pred_2 = pred[1]
@@ -280,6 +252,7 @@ class Trainer():
                 loss_seg_value_2 += loss_2.cpu().item() / iter_num
 
             # optimizer
+            self.optimizer.zero_grad()
             cur_loss.backward()
             self.optimizer.step()
 
@@ -292,10 +265,6 @@ class Trainer():
                 else:
                     self.logger.info("The train loss of epoch{}-batch-{}:{}".format(self.current_epoch,
                                                                             batch_idx, cur_loss.item()))
-                
-            batch_idx += 1
-
-            self.current_iter += 1
 
             if np.isnan(float(cur_loss.item())):
                 raise ValueError('Loss is nan during training...')
@@ -305,9 +274,10 @@ class Trainer():
             argpred = np.argmax(pred, axis=1)
             self.Eval.add_batch(label, argpred)
 
-            # if batch_idx==self.dataloader.num_iterations:
-            #     break
-        
+            batch_idx += 1
+            self.current_iter += 1
+            # break
+
         self.log_one_train_epoch(x, label, argpred, train_loss)
         tqdm_epoch.close()
 
@@ -343,23 +313,24 @@ class Trainer():
         self.writer.add_scalar('train_loss', tr_loss, self.current_epoch)
         tqdm.write("The average loss of train epoch-{}-:{}".format(self.current_epoch, tr_loss))
 
-    def seg_transform(self,tensor):
+    def seg_transform(self, tensor, source_label_tf=None):
         '''
         :param tensor: the tensor after style transform
+        :param source_label_tf
         :functionality: resize the tensor for segmentation network
         :return: resized and transformed tensor ready to be parsed of shape (batch,channel,height,width)
         '''
         size = [self.args.base_size[1], self.args.base_size[0]]
         if self.args.seg_size != self.args.base_size:
             import torch.nn.functional as F
-            tensor = F.interpolate(tensor, size=[self.args.seg_size[1],self.args.seg_size[0]])
+            tensor = F.interpolate(tensor, size=[self.args.seg_size[1], self.args.seg_size[0]])
+            source_label_tf = F.interpolate(source_label_tf.unsqueeze(0),
+                                            size=[self.args.seg_size[1], self.args.seg_size[0]]).squeeze(0)
             size = [self.args.seg_size[1], self.args.seg_size[0]]
 
-        # print('tensor.shape, for segnet',tensor.shape)
-
-        trans_source_tensor = tensor.mul(255).add(0.5).clamp(0, 255)#-120
+        trans_source_tensor = tensor.mul(255).add(0.5).clamp(0, 255)  # -120
         # print('tensor.shape',tensor.shape)
-        d = torch.Tensor([122.67891434, 116.66876762,104.00698793]).reshape(-1, 1, 1).expand(-1, size[0], size[1])
+        d = torch.Tensor([122.67891434, 116.66876762, 104.00698793]).reshape(-1, 1, 1).expand(-1, size[0], size[1])
         if torch.cuda.is_available():
             d = d.to('cuda:1')
         trans_source_tensor = trans_source_tensor.squeeze(0) - d
@@ -368,7 +339,7 @@ class Trainer():
         b = trans_source_tensor[2, :, :]
         trans_source_tensor = torch.stack([b, g, r], dim=0).unsqueeze(0)
 
-        return trans_source_tensor
+        return trans_source_tensor, source_label_tf
 
     def rectification(self, maxpred, argpred, id, x0, y0):
         #### crop & resize then Transfer ###
@@ -405,7 +376,35 @@ class Trainer():
 
         return argpred
 
-    def validate(self, mode='val'):
+    def validate_client(self):
+        self.logger.info('\nvalidating one epoch...')
+        with torch.no_grad():
+            tqdm_batch = tqdm(self.dataloader.val_loader, total=self.dataloader.valid_iterations,
+                              desc="Val Epoch-{}-".format(self.current_epoch + 1))
+            self.model.eval()
+            for i, x in enumerate(tqdm_batch):
+                # prepare for segmentation ###
+                if self.cuda:
+                    x = x.to('cuda:0')
+
+                # segmentation and prediction ###
+                pred = self.model(x)
+                if isinstance(pred, tuple):
+                    pred = pred[0]
+
+                pred = pred.data.cpu().numpy()
+                argpred = np.argmax(pred, axis=1)
+
+                #show val result on tensorboard
+                images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images, numpy_transform=self.args.numpy_transform)
+                preds_colors = decode_labels(argpred, self.args.show_num_images)
+                for index, (img, color_pred) in enumerate(zip(images_inv, preds_colors)):
+                    self.writer.add_image(str(i)+'/Images', img, self.current_epoch)
+                    self.writer.add_image(str(i)+'/preds', color_pred, self.current_epoch)
+
+            tqdm_batch.close()
+
+    def validate(self, epoch, mode='val'):
         self.logger.info('\nvalidating one epoch...')
         self.Eval.reset()
         with torch.no_grad():
@@ -413,23 +412,32 @@ class Trainer():
                               desc="Val Epoch-{}-".format(self.current_epoch + 1))
             if mode == 'val':
                 self.model.eval()
-            for x_org, y, id in tqdm_batch:
-                self.x_org = x_org
-                _, __, self.x_height, self.x_width = x_org.shape
+            i = 0
+            for x_org, y, id  in tqdm_batch:
+                if self.args.rectification:
+                    self.x_org = x_org
+                    _, __, self.x_height, self.x_width = x_org.shape
 
-                x = self.network(x_org, self.batch_style)
+                if self.args.DA:
+                    if self.args.crop_trans:
+                        x = self.cropTrans(x_org)
+                    elif self.args.DA:
+                        x = self.network(x_org, self.batch_style)
+                    x, y = self.seg_transform(x, y)  # (1,3,640,1280)
+                else:
+                    x = x_org
 
-                ## prepare for segmentation ###
-                x = self.seg_transform(x) # (1,3,640,1280)
-                if self.args.seg_size != self.args.base_size:
-                    y = F.interpolate(y.unsqueeze(0), size=[self.args.seg_size[1], self.args.seg_size[0]]).squeeze(0)
+                # prepare for segmentation ###
                 if self.cuda:
                     x, y = x.to('cuda:0'), y.to(device='cuda:0', dtype=torch.long)
 
-                ### segmentation and prediction ###
+                # segmentation and prediction ###
                 pred = self.model(x)
                 if isinstance(pred, tuple):
                     pred = pred[0]
+
+                if i == 0 and self.args.DA:
+                    self.save_images(np.argmax(pred.cpu().detach(), axis=1), y, x, 'target_val', epoch)
                 y = torch.squeeze(y, 1)
                 label = y.cpu().numpy()
 
@@ -464,6 +472,7 @@ class Trainer():
                     labels_colors = decode_labels(label[:, segy0:int(segy0+0.5*self.args.seg_size[1]), segx0:int(segx0+0.5*self.args.seg_size[0])], 1)
                     self.writer.add_image('{}/label'.format(id.item()), labels_colors, self.current_epoch) # label # (1, 640, 1280)
                 self.Eval.add_batch(label, argpred)
+                i += 1
 
             #show val result on tensorboard
             images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images, numpy_transform=self.args.numpy_transform)
@@ -517,7 +526,7 @@ class Trainer():
 
         return PA, MPA, MIoU, FWIoU
 
-    def validate_source(self):
+    def validate_source(self, epoch):
         self.logger.info('\nvalidating source domain...')
         self.Eval.reset()
         with torch.no_grad():
@@ -526,11 +535,11 @@ class Trainer():
             self.model.eval()
             i = 0
             for x, y, id in tqdm_batch:
-                x = self.network(x,self.batch_style)
-                x = self.seg_transform(x)
-                if self.args.seg_size != self.args.base_size:
-                    y = F.interpolate(y.unsqueeze(0), size=[self.args.seg_size[1], self.args.seg_size[0]]).squeeze(0)
-
+                if self.args.crop_trans:
+                    x = self.cropTrans(x)
+                else:
+                    x = self.network(x, self.batch_style)
+                x,y = self.seg_transform(x, y)
 
                 if self.cuda:
                     x, y = x.to('cuda:0'), y.to(device='cuda:0', dtype=torch.long)
@@ -542,6 +551,8 @@ class Trainer():
                     pred = pred[0]
                     pred_P = F.softmax(pred, dim=1)
                     pred_P_2 = F.softmax(pred_2, dim=1)
+                if i == 0:
+                    self.save_images(np.argmax(pred.cpu().detach(), axis=1), y, x, 'source_val', epoch)
                 y = torch.squeeze(y, 1)
                 pred = pred.data.cpu().numpy()
                 label = y.cpu().numpy()
@@ -628,29 +639,22 @@ class Trainer():
             statedict = self.model.module.state_dict()
         else:
             statedict = self.model.state_dict()
-        netdict = self.network.state_dict()
-        state = {
-            'epoch': self.current_epoch + 1,
-            'iteration': self.current_iter,
-            'state_dict': statedict,
-            'optimizer': self.optimizer.state_dict(),
-            'best_MIou':self.best_MIou
-        }
-        # if self.network:
-        #     state['network'] = netdict,
+        state = {'epoch': self.current_epoch + 1, 'iteration': self.current_iter,
+                 'state_dict': statedict, 'optimizer': self.optimizer.state_dict(),
+                 'best_MIou':self.best_MIou}
         torch.save(state, filename)
 
     def load_checkpoint(self, filename):
         try:
             self.logger.info("Loading checkpoint '{}'".format(filename))
             if self.cuda:
-                checkpoint = torch.load(filename)
+                checkpoint = torch.load(filename, map_location=torch.device('cuda:0'))
             else:
-                checkpoint = torch.load(filename,map_location=torch.device('cpu'))
+                checkpoint = torch.load(filename, map_location=torch.device('cpu'))
 
             if 'state_dict' in checkpoint:
                 print('state_dict in checkpoint')
-                self.model.load_state_dict(checkpoint['state_dict'])
+                self.model.module.load_state_dict(checkpoint['state_dict'])
             else:
                 self.model.module.load_state_dict(checkpoint['state_dict'])
 
@@ -694,12 +698,11 @@ def add_train_args(arg_parser):
                             help="the root path of dataset")
     arg_parser.add_argument('--checkpoint_dir',
                             default=#'/data/Projects/MaxSquareLoss/log/train/trans_gta5_pretrain_add_multi/IW_MS_UNION_upseg_1832_strain_1e-3_add_multi/GTA52Cityscapes_IW_maxsquarebest.pth',
-    "./log/train/trans_gta5_pretrain_add_multi/IW_MS_trans_plateau/gta52cityscapes_IW_maxsquaremIOUbest_epoch_25.pth",
+                                     # "./log/train/trans_gta5_pretrain_add_multi/IW_MS_trans_plateau/gta52cityscapes_IW_maxsquaremIOUbest_epoch_25.pth",
+                                    '/data/Projects/MaxSquareLoss/log/train/add_multi_gta_only/add_multibest.pth',
                             help="the path of ckpt file")
-    arg_parser.add_argument("--save_dir",default="./log/train/trans_gta5_pretrain_add_multi/IW_MS_UNION_seg1216_trans_classifier_add_multi/",
+    arg_parser.add_argument("--save_dir",default="./log/train/add_multi_cityscapes_only/train_city",
                             help="the path that you want to save all the output")
-    arg_parser.add_argument("--restore_id",type=str, default="add_multi",
-                            help="the id that help find load model")
 
     # Model related arguments
     arg_parser.add_argument('--backbone', default='deeplabv2_multi',
@@ -722,25 +725,25 @@ def add_train_args(arg_parser):
                             help=" the num of gpu")
     arg_parser.add_argument("--batch_size",default=1,type=int,
                             help="directly set batch size")
-    arg_parser.add_argument("--exp_tag",type=str,default="test",
+    arg_parser.add_argument("--exp_tag", type=str, default="test",
                             help="Set tag for each experiment")
 
     # dataset related arguments
-    arg_parser.add_argument('--dataset', default='cityscapes', type=str,
+    arg_parser.add_argument('--dataset', default='Cityscapes', type=str,
                             help='dataset choice')
-    arg_parser.add_argument('--base_size', default="1843,922", type=str, # for random crop
-                            help='crop size of image')
-    arg_parser.add_argument('--crop_size', default="1843,922", type=str,
-                            help='base size of image')
-    arg_parser.add_argument('--target_base_size', default="1843,922", type=str, # for random crop
-                            help='crop size of target image')
-    arg_parser.add_argument('--target_crop_size', default="1843,922", type=str,
+    arg_parser.add_argument('--base_size', default="1856,928", type=str, # for random crop
+                            help='base size of source image')
+    arg_parser.add_argument('--crop_size', default="928,464", type=str,
+                            help='crop size of source image')
+    arg_parser.add_argument('--target_base_size', default="1856,928", type=str, # for random crop
                             help='base size of target image')
-    arg_parser.add_argument('--seg_size', default=(1216,576),
+    arg_parser.add_argument('--target_crop_size', default="928,464", type=str,
+                            help='crop size of target image')
+    arg_parser.add_argument('--seg_size', default=(1280, 640),
                             help='the size input to segmentation network')
     arg_parser.add_argument('--num_classes', default=19, type=int,
                             help='num class of mask')
-    arg_parser.add_argument('--data_loader_workers', default=1, type=int,
+    arg_parser.add_argument('--data_loader_workers', default=0, type=int,
                             help='num_workers of Dataloader')
     arg_parser.add_argument('--pin_memory', default=2, type=int,
                             help='pin_memory of Dataloader')
@@ -772,23 +775,29 @@ def add_train_args(arg_parser):
                             help="the maxinum of iteration")
     arg_parser.add_argument('--iter_stop', type=int, default=80000,
                             help="the early stop step")
-    arg_parser.add_argument('--poly_power', type=float, default=0.95,
+    arg_parser.add_argument('--poly_power', type=float, default=0.9,
                             help="poly_power")
+
+    # different training module
     arg_parser.add_argument('--rectification', type=bool, default=False,
                             help='if rectify the final result')
+    arg_parser.add_argument('--crop_trans', type=bool, default=False,
+                            help='if crop trans the pic for style transfer')
+    arg_parser.add_argument('--client', type=bool, default=False,
+                            help='if use client dataset for validation')
+    arg_parser.add_argument('--DA', type=bool, default=False,
+                            help='if doing domain adaptation')
+
 
     # multi-level output
-
     arg_parser.add_argument('--multi', default=True, type=str2bool,
                         help='output model middle feature')
     arg_parser.add_argument('--lambda_seg', type=float, default=0.1,
                         help="lambda_seg of middle output")
     return arg_parser
 
-def init_args(args):
-    # if torch.cuda.device_count()==1:
-    #     args.batch_size = 1
 
+def init_args(args):
     print("batch size: ", args.batch_size)
 
     train_id = args.exp_tag
@@ -837,10 +846,11 @@ def init_args(args):
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.random.manual_seed(args.seed)
-    torch.backends.cudnn.benchmark=True
+    torch.backends.cudnn.benchmark = True
 
     return args, train_id, logger
-    
+
+
 if __name__ == '__main__':
     assert LooseVersion(torch.__version__) >= LooseVersion('1.0.0'), 'PyTorch>=1.0.0 is required'
 

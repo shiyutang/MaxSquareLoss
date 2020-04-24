@@ -19,8 +19,6 @@ class CrossCity_Dataset(City_Dataset):
                  data_root_path='./datasets/NTHU_Datasets/Rio',
                  list_path='./datasets/NTHU_list/Rio/List',
                  split='train',
-                 base_size=769,
-                 crop_size=769,
                  training=True,
                  class_13=False):
 
@@ -92,8 +90,6 @@ class CrossCity_DataLoader():
                                 data_root_path=args.data_root_path,
                                 list_path=args.list_path,
                                 split=args.split,
-                                base_size=args.base_size,
-                                crop_size=args.crop_size,
                                 training=training)
 
         if self.args.split == "train":

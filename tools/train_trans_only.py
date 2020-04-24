@@ -31,18 +31,14 @@ class UDATrainer(Trainer):
                                    data_root_path=self.datasets_path[self.styles_source[0]]['data_root_path'],
                                    list_path=self.datasets_path[self.styles_source[0]]['list_path'],
                                    gt_path=self.datasets_path[self.styles_source[0]]['gt_path'],
-                                   split='train',
-                                   base_size=args.base_size,
-                                   crop_size=args.crop_size)
+                                   split='train')
 
             ## source validation loader
             source_trans_data_set_val = GTA5_Dataset(args,
                                            data_root_path=self.datasets_path[self.styles_source[0]]['data_root_path'],
                                            list_path=self.datasets_path[self.styles_source[0]]['list_path'],
                                            gt_path=self.datasets_path[self.styles_source[0]]['gt_path'],
-                                           split='test',
-                                           base_size=args.base_size,
-                                           crop_size=args.crop_size)
+                                           split='test')
 
         elif 'SYNTHIA' in self.styles_source[0]:
             source_trans_data_set_train = SYNTHIA_Dataset(args,
@@ -83,8 +79,6 @@ class UDATrainer(Trainer):
                        list_path=self.datasets_path[self.styles_target[0]]['list_path'],
                        gt_path=self.datasets_path[self.styles_target[0]]['gt_path'],
                        split='train',
-                       base_size=args.target_base_size,
-                       crop_size=args.target_crop_size,
                        class_16=args.class_16)
         self.target_trans_dataloader = data.DataLoader(target_trans_data_set,
                                                        batch_size=self.args.batch_size,
@@ -98,8 +92,6 @@ class UDATrainer(Trainer):
                        list_path=self.datasets_path[self.styles_target[0]]['list_path'],
                        gt_path=self.datasets_path[self.styles_target[0]]['gt_path'],
                        split='val',
-                       base_size=args.target_base_size,
-                       crop_size=args.target_crop_size,
                        class_16=args.class_16)
         self.target_val_dataloader = data.DataLoader(target_trans_data_set,
                                                      batch_size=self.args.batch_size,
@@ -195,7 +187,7 @@ class UDATrainer(Trainer):
 
         # load pretrained checkpoint
         if self.args.checkpoint_dir is not None:
-            self.args.pretrained_ckpt_file = os.path.join(self.args.checkpoint_dir, self.restore_id + 'best.pth')
+            self.args.pretrained_ckpt_file = self.args.checkpoint_dir
             self.load_checkpoint(self.args.pretrained_ckpt_file)
 
         if not self.args.continue_training:
@@ -204,7 +196,7 @@ class UDATrainer(Trainer):
             self.current_iter = 0
             self.current_epoch = 0
         else:
-            self.load_checkpoint(os.path.join(self.args.checkpoint_dir, self.restore_id + 'final.pth'))
+            self.load_checkpoint(self.args.checkpoint_dir)
             self.best_iter = self.current_iter  # the best iteration for target
             self.best_source_iter = self.current_iter  # the best iteration for source
 

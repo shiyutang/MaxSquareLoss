@@ -28,6 +28,7 @@ datasets_path={
 
 classes = ['GTA5', 'Cityscapes']
 
+
 class CityscapeDataset(data.Dataset):
     def __init__(self, dataset_path, split,args):
         self.args = args
@@ -40,7 +41,6 @@ class CityscapeDataset(data.Dataset):
 
         self.items = [id.strip() for id in open(item_list_filepath)]
 
-
     def __getitem__(self, item):
         id = self.items[item]
         imagepath = os.path.join(self.dataset_path['image_path'], id)
@@ -50,7 +50,6 @@ class CityscapeDataset(data.Dataset):
 
     def __len__(self):
         return len(self.items)
-
 
     def transform(self):
         size = (self.args.base_size[1], self.args.base_size[0])
@@ -106,7 +105,6 @@ def showimg(trainloader):
         npimg = img.numpy()
         plt.imshow(np.transpose(npimg, (1, 2, 0)))
         plt.show()
-
 
     # get some random training images
     dataiter = iter(trainloader)
@@ -202,10 +200,8 @@ class Trainer():
 
         return total_acc,GTA5acc,Cityacc
 
-
     def save_model(self,path):
         torch.save(self.classifier.state_dict(),os.path.join(path,'best.pth'))
-
 
     def train(self):
         tqdm_epoch = tqdm(self.dataloader_train)
@@ -225,7 +221,7 @@ class Trainer():
                         data = torch.cat(result, 0)
 
                 if torch.cuda.is_available():
-                    data,label = Variable(data).to("cuda:0"),Variable(label).to('cuda:0')
+                    data, label = Variable(data).to("cuda:0"),Variable(label).to('cuda:0')
 
                 data = F.interpolate(data,size=(256,512))
                 pred = self.classifier(data)
@@ -250,12 +246,13 @@ class Trainer():
             self.writer.add_scalar('GTA5_acc', GTA5acc, epoch)
             self.writer.add_scalar('City_acc', Cityacc, epoch)
 
-            if accuracy> best_acc:
+            if accuracy > best_acc:
                 best_acc = accuracy
                 self.save_model(path = self.args.save_dir)
                 print('saved model to {}'.format(self.args.save_dir))
 
         self.writer.close()
+
 
 def add_args(parser):
     parser.add_argument('--lr',type=float,default=0.001)
@@ -269,7 +266,7 @@ def add_args(parser):
     arg_parser.add_argument('--pin_memory', default=2, type=int,
                             help='pin_memory of Dataloader')
     parser.add_argument('--save_dir', type=str,default=
-       '/data/Projects/MaxSquareLoss/log/train/Discrepancy_measure')
+       '/data/Projects/MaxSquareLoss/log/train/Discrepancy_measure/trans_after_classifier_a1wts1stwts1')
 
     parser.add_argument('--ST',type=bool,default=False,
                         help='if use style transfer to transfer input image')

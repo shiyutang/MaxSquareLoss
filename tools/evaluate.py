@@ -69,8 +69,6 @@ class Evaluater():
                                     data_root_path=self.args.data_root_path,
                                     list_path=self.args.list_path,
                                     split='val',
-                                    base_size=self.args.target_base_size,
-                                    crop_size=self.args.target_crop_size,
                                     class_13=self.args.class_13)
             self.target_val_dataloader = data.DataLoader(target_data_set,
                                                 batch_size=self.args.batch_size,

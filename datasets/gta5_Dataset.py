@@ -32,22 +32,19 @@ class FlatFolderDataset(data.Dataset):
 
 
 class GTA5_Dataset(City_Dataset):
-    def __init__(self,
-                 args,
+    def __init__(self, args,
                  data_root_path='./datasets/GTA5',
                  list_path='./datasets/GTA5/list',
-                 gt_path = None,
+                 gt_path=None,
                  split='train',
-                 base_size=769,  ## for random crop
-                 crop_size=769,  ## for resize
                  training=True):
 
         self.args = args
         self.data_path=data_root_path
         self.list_path=list_path
         self.split=split
-        self.base_size=base_size
-        self.crop_size=crop_size
+        self.base_size=args.base_size  ## for random crop
+        self.crop_size=args.crop_size  ## for resize
 
         self.base_size = self.base_size if isinstance(self.base_size, tuple) else (self.base_size, self.base_size)
         self.crop_size = self.crop_size if isinstance(self.crop_size, tuple) else (self.crop_size, self.crop_size)
@@ -56,7 +53,6 @@ class GTA5_Dataset(City_Dataset):
         self.random_mirror = args.random_mirror
         self.random_crop = args.random_crop
         self.resize = args.resize
-        self.gaussian_blur = args.gaussian_blur
 
         if 'train' in self.split:
             item_list_filepath = os.path.join(self.list_path, 'train'+".txt")
@@ -109,8 +105,6 @@ class GTA5_DataLoader():
                                 list_path=datasets_path['list_path'],
                                 gt_path=datasets_path['gt_path'],
                                 split=args.split,
-                                base_size=args.base_size,
-                                crop_size=args.crop_size,
                                 training=training)
 
         if "train" in self.args.split:
@@ -136,8 +130,6 @@ class GTA5_DataLoader():
                                list_path=datasets_path['list_path'],
                                gt_path=datasets_path['gt_path'],
                                 split=val_split,
-                                base_size=args.base_size,
-                                crop_size=args.crop_size,
                                 training=False)
         self.val_loader = data.DataLoader(val_set,
                                             batch_size=self.args.batch_size,
