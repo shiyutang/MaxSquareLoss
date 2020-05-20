@@ -4,21 +4,7 @@ By Minghao Chen, Hongyang Xue, Deng Cai.
 
 ## Introduction
 
-A **PyTorch** implementation for our ICCV 2019 paper ["Domain Adaptation for Semantic Segmentation with Maximum Squares Loss"](https://arxiv.org/abs/1909.13589). The segmentation model is based on Deeplabv2 with ResNet-101 backbone. "MaxSquare+IW+Multi" introduced in the paper achieves competitive result on three UDA datasets: GTA5, SYNTHIA, CrossCity dataset. Moreover, our method achieves the state-of-the-art results in GTA5-to-Cityscapes and Cityscapes-to-CrossCity adaptation.
-
-### Citation
-
-If you use this code in your research, please cite:
-
-```
-@InProceedings{Chen_2019_ICCV,
-author = {Chen, Minghao and Xue, Hongyang and Cai, Deng},
-title = {Domain Adaptation for Semantic Segmentation With Maximum Squares Loss},
-booktitle = {The IEEE International Conference on Computer Vision (ICCV)},
-month = {October},
-year = {2019}
-}
-```
+A **PyTorch** implementation of a coarse to fine feature alignment method useing style transfer based coarse feature alignment and entropy minimization based fine feature alignment 
 
 ## Requirements
 The code is implemented with Python(3.6) and Pytorch(1.0.0).
@@ -60,37 +46,9 @@ We present several transfered results reported in our paper and provide the corr
 
 ### GTA5-to-Cityscapes:
 
-| Method  | Source | MinEnt | [MaxSquare](https://drive.google.com/open?id=1KmM8zBD1G1XTmzaV_I_aJgi9DW-49kxc) | [MaxSquare+IW](https://drive.google.com/open?id=11oliS-Vu2W6dB8W9ZvqlN0R4cC4Pb8i6) | [MaxSquare+IW+Multi](https://drive.google.com/open?id=1YwK68IMmWHZnAL8FU9ZY-Le34P80Kf86) |
+| Method  | Source | style transfer | [MaxSquare](https://drive.google.com/open?id=1KmM8zBD1G1XTmzaV_I_aJgi9DW-49kxc) | [MaxSquare+IW](https://drive.google.com/open?id=11oliS-Vu2W6dB8W9ZvqlN0R4cC4Pb8i6) | [MaxSquare+IW+Multi](https://drive.google.com/open?id=1YwK68IMmWHZnAL8FU9ZY-Le34P80Kf86) |
 | :-----: | :----: | :----: | :----------------------------------------------------------: | :----------------------------------------------------------: | :----------------------------------------------------------: |
-| mIoU(%) |  36.9  |  42.2  |                             44.3                             |                             45.2                             |                             46.4                             |
-
-
-
-### Cityscapes-to-CrossCity
-
-##### **Rome**
-
-| Method  | Source | [MaxSquare](https://drive.google.com/open?id=1FxEf5bLjKJyxAjyca6V62yLLyWCYJeOI) | [MaxSquare+IW](https://drive.google.com/open?id=1zBHyWkfo02CZ1nCGYa_n8cB2MaC5lwoi) |
-| :-----: | :----: | :----------------------------------------------------------: | :----------------------------------------------------------: |
-| mIoU(%) |  51.0  |                             53.9                             |                             54.5                             |
-
-**Rio**
-
-| Method  | Source | [MaxSquare](https://drive.google.com/open?id=1pw-jnvXmbsuADD-EbhAquE4o6Co4EVoj) | [MaxSquare+IW](https://drive.google.com/open?id=1pw-jnvXmbsuADD-EbhAquE4o6Co4EVoj) |
-| :-----: | :----: | :----------------------------------------------------------: | :----------------------------------------------------------: |
-| mIoU(%) |  48.9  |                             52.0                             |                             53.3                             |
-
-**Tokyo**
-
-| Method  | Source | [MaxSquare](https://drive.google.com/open?id=1VG_rxgsaHjLMzB4mVzs33zI4sFqYh2KX) | [MaxSquare+IW](https://drive.google.com/open?id=1XMtgHlQpcaAva6EBpal-X1l5J70kQNbT) |
-| :-----: | :----: | :----------------------------------------------------------: | :----------------------------------------------------------: |
-| mIoU(%) |  47.8  |                             49.7                             |                             50.5                             |
-
-**Taipei**
-
-| Method  | Source | [MaxSquare](https://drive.google.com/open?id=1JyMyAGg5_etcxtNR4s6bmVBOR6C1BdO3) | [MaxSquare+IW](https://drive.google.com/open?id=1quvl9m956aRrYvdpClzMgBcI5HCuvB2o) |
-| :-----: | :----: | :----------------------------------------------------------: | :----------------------------------------------------------: |
-| mIoU(%) |  46.3  |                             49.8                             |                             50.6                             |
+| mIoU(%) |  36.9  |   44.2 |                             44.3                             |                             45.2                             |                             46.4                             |
 
 
 
@@ -203,6 +161,6 @@ python3 tools/solve_crosscity.py --gpu "0" --city_name 'Rome' --source_dataset '
 
 ## Acknowledgment
 
-The structure of this code is largely based on [this repo](https://github.com/hualin95/Deeplab-v3plus).
+The structure of this code is largely based on [this repo](https://github.com/ZJULearning/MaxSquareLoss).
 
 Deeplabv2 model is borrowed from [Pytorch-Deeplab](https://github.com/speedinghzl/Pytorch-Deeplab).

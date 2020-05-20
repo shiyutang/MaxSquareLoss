@@ -95,7 +95,7 @@ class UDATrainer(Trainer):
         self.network = Net()
         self.network.train()
 
-        ## define target loss
+        # define target loss
         self.ignore_index = -1
         if self.args.target_mode == "hard":
             self.target_loss = nn.CrossEntropyLoss(ignore_index=-1)
@@ -117,7 +117,7 @@ class UDATrainer(Trainer):
 
         self.target_hard_loss = nn.CrossEntropyLoss(ignore_index=-1)
 
-        ## initially add network parameters into
+        # initially add network parameters into
 
         # self.adain_optimizer = torch.optim.Adam(self.network.parameters(),
         #                         lr=self.args.adain_lr)
@@ -272,7 +272,7 @@ class UDATrainer(Trainer):
             ############################################
             # get source and target picture from ADAIN #
             ############################################
-            ## source ##
+            # source
             content, source_label_tf, source_id = batch_s
             with torch.no_grad():
                 if self.args.crop_trans:
@@ -280,7 +280,7 @@ class UDATrainer(Trainer):
                 else:
                     trans_source = self.network(content, self.batch_style)
 
-            ## target
+            # target
             content, target_label, target_id = batch_t
             with torch.no_grad():
                 if self.args.crop_trans:

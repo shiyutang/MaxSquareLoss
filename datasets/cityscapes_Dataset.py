@@ -171,16 +171,17 @@ class City_Dataset(data.Dataset):
         return image_tf, gt_image, item
 
     def _train_sync_transform(self, img, mask):
-        '''
+        """
         :param image:  PIL input image
         :param gt_image: PIL input gt_image
         :return:
-        '''
+        """
         if self.random_mirror:
             # random mirror
             if random.random() < 0.5:
                 img = img.transpose(Image.FLIP_LEFT_RIGHT)
-                if mask: mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
+                if mask:
+                    mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
 
         # crop and resize to base_size
         if self.random_crop:
@@ -198,8 +199,8 @@ class City_Dataset(data.Dataset):
         # resize to the base_size
         if self.resize:
             img = img.resize(self.rsize, Image.BICUBIC)
-            if mask: mask = mask.resize(self.rsize, Image.NEAREST)
-
+            if mask:
+                mask = mask.resize(self.rsize, Image.NEAREST)
 
         # final transform
         if self.args.DA:
@@ -267,10 +268,8 @@ class City_Dataset(data.Dataset):
     def adain_transform(self,size):
         from torchvision import transforms
         base_size = (size[1],size[0])
-        # crop_size = (self.crop_size[1],self.crop_size[0])
         transform_list = [
             transforms.Resize(size=base_size),  # (h,w) 512, 1024
-            # transforms.RandomCrop(crop_size),
             transforms.ToTensor()
         ]
         return transforms.Compose(transform_list)

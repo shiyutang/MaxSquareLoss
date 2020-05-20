@@ -10,6 +10,7 @@ from datasets.cityscapes_Dataset import City_Dataset, City_DataLoader
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
+
 class FlatFolderDataset(data.Dataset):
     def __init__(self, root, transform):
         super(FlatFolderDataset, self).__init__()
@@ -30,7 +31,6 @@ class FlatFolderDataset(data.Dataset):
         return 'FlatFolderDataset'
 
 
-
 class GTA5_Dataset(City_Dataset):
     def __init__(self, args,
                  data_root_path='./datasets/GTA5',
@@ -40,11 +40,11 @@ class GTA5_Dataset(City_Dataset):
                  training=True):
 
         self.args = args
-        self.data_path=data_root_path
-        self.list_path=list_path
-        self.split=split
-        self.base_size=args.base_size  ## for random crop
-        self.crop_size=args.crop_size  ## for resize
+        self.data_path = data_root_path
+        self.list_path = list_path
+        self.split = split
+        self.base_size = args.base_size   # for random crop
+        self.crop_size = args.crop_size   # for resize
 
         self.base_size = self.base_size if isinstance(self.base_size, tuple) else (self.base_size, self.base_size)
         self.crop_size = self.crop_size if isinstance(self.crop_size, tuple) else (self.crop_size, self.crop_size)
@@ -55,19 +55,18 @@ class GTA5_Dataset(City_Dataset):
         self.resize = args.resize
 
         if 'train' in self.split:
-            item_list_filepath = os.path.join(self.list_path, 'train'+".txt")
+            item_list_file_path = os.path.join(self.list_path, 'train' + ".txt")
         elif "val" in self.split:
-            item_list_filepath = os.path.join(self.list_path, 'test'+".txt")
+            item_list_file_path = os.path.join(self.list_path, 'test' + ".txt")
 
-
-        if not os.path.exists(item_list_filepath):
+        if not os.path.exists(item_list_file_path):
             raise Warning("split must be train/val/trainval/test/all")
 
         self.image_filepath = os.path.join(self.data_path, "images")
 
         self.gt_filepath = gt_path
 
-        self.items = [id.strip() for id in open(item_list_filepath)]
+        self.items = [id.strip() for id in open(item_list_file_path)]
 
         ignore_label = -1
         self.id_to_trainid = {7: 0, 8: 1, 11: 2, 12: 3, 13: 4, 17: 5,
@@ -80,12 +79,12 @@ class GTA5_Dataset(City_Dataset):
 
     def __getitem__(self, item):
         # id = int(self.items[item][-9:-4])
-        id = int(self.items[item])
+        idx = int(self.items[item])
 
-        image_path = os.path.join(self.image_filepath, "{:0>5d}.png".format(id))
+        image_path = os.path.join(self.image_filepath, "{:0>5d}.png".format(idx))
         image = Image.open(image_path).convert("RGB")
 
-        gt_image_path = os.path.join(self.gt_filepath, "{:0>5d}.png".format(id))
+        gt_image_path = os.path.join(self.gt_filepath, "{:0>5d}.png".format(idx))
         gt_image = Image.open(gt_image_path)
 
         if ("train" in self.split or "trainval" in self.split) and self.training:
@@ -93,14 +92,15 @@ class GTA5_Dataset(City_Dataset):
         else:
             image_tf, gt_image = self._val_sync_transform(image, gt_image)
 
-        return image_tf, gt_image, str(id)
+        return image_tf, gt_image, str(idx)
+
 
 class GTA5_DataLoader():
-    def __init__(self, args, training=True,datasets_path=None):
+    def __init__(self, args, training=True, datasets_path=None):
 
         self.args = args
 
-        data_set = GTA5_Dataset(args, 
+        data_set = GTA5_Dataset(args,
                                 data_root_path=datasets_path['data_root_path'],
                                 list_path=datasets_path['list_path'],
                                 gt_path=datasets_path['gt_path'],
@@ -129,16 +129,14 @@ class GTA5_DataLoader():
                                data_root_path=datasets_path['data_root_path'],
                                list_path=datasets_path['list_path'],
                                gt_path=datasets_path['gt_path'],
-                                split=val_split,
-                                training=False)
+                               split=val_split,
+                               training=False)
         self.val_loader = data.DataLoader(val_set,
-                                            batch_size=self.args.batch_size,
-                                            shuffle=False,
-                                            num_workers=self.args.data_loader_workers,
-                                            pin_memory=self.args.pin_memory,
-                                            drop_last=True)
+                                          batch_size=self.args.batch_size,
+                                          shuffle=False,
+                                          num_workers=self.args.data_loader_workers,
+                                          pin_memory=self.args.pin_memory,
+                                          drop_last=True)
         self.valid_iterations = (len(val_set) + self.args.batch_size) // self.args.batch_size
 
         self.num_iterations = (len(data_set) + self.args.batch_size) // self.args.batch_size
-
-

@@ -6,11 +6,12 @@ import pickle
 
 from graphs.models.deeplab_multi import DeeplabMulti
 
+
 def get_model(args):
     if args.backbone == "deeplabv2_multi":
         model = DeeplabMulti(num_classes=args.num_classes,
-                            pretrained=args.imagenet_pretrained)
-        params = model.optim_parameters(args) # 分类层是十倍的学习率，其他是正常学习率
+                             pretrained=args.imagenet_pretrained)
+        params = model.optim_parameters(args)  # 分类层是十倍的学习率，其他是正常学习率
         args.numpy_transform = True
     return model, params
 
@@ -35,6 +36,7 @@ def adaptive_instance_normalization(content_feat, style_feat):
     normalized_feat = (content_feat - content_mean.expand(
         size)) / content_std.expand(size)
     return normalized_feat * style_std.expand(size) + style_mean.expand(size)
+
 
 vgg = nn.Sequential(
     nn.Conv2d(3, 3, (1, 1)),
@@ -92,37 +94,36 @@ vgg = nn.Sequential(
     nn.ReLU()  # relu5-4
 )
 
-
 decoder = nn.Sequential(
-    nn.ReflectionPad2d((1, 1, 1, 1)), #0
+    nn.ReflectionPad2d((1, 1, 1, 1)),  # 0
     nn.Conv2d(512, 256, (3, 3)),
     nn.ReLU(),
-    nn.Upsample(scale_factor=2, mode='nearest'),#3
+    nn.Upsample(scale_factor=2, mode='nearest'),  # 3
     nn.ReflectionPad2d((1, 1, 1, 1)),
     nn.Conv2d(256, 256, (3, 3)),
-    nn.ReLU(),                       #6
+    nn.ReLU(),  # 6
     nn.ReflectionPad2d((1, 1, 1, 1)),
     nn.Conv2d(256, 256, (3, 3)),
-    nn.ReLU(),                       #9
+    nn.ReLU(),  # 9
     nn.ReflectionPad2d((1, 1, 1, 1)),
     nn.Conv2d(256, 256, (3, 3)),
-    nn.ReLU(),                       #12
+    nn.ReLU(),  # 12
     nn.ReflectionPad2d((1, 1, 1, 1)),
-    nn.Conv2d(256, 128, (3, 3)),     #14
+    nn.Conv2d(256, 128, (3, 3)),  # 14
     nn.ReLU(),
-    nn.Upsample(scale_factor=2, mode='nearest'), #16
+    nn.Upsample(scale_factor=2, mode='nearest'),  # 16
     nn.ReflectionPad2d((1, 1, 1, 1)),
     nn.Conv2d(128, 128, (3, 3)),
-    nn.ReLU(),                        #19
+    nn.ReLU(),  # 19
     nn.ReflectionPad2d((1, 1, 1, 1)),
     nn.Conv2d(128, 64, (3, 3)),
     nn.ReLU(),
-    nn.Upsample(scale_factor=2, mode='nearest'), #23
+    nn.Upsample(scale_factor=2, mode='nearest'),  # 23
     nn.ReflectionPad2d((1, 1, 1, 1)),
     nn.Conv2d(64, 64, (3, 3)),
-    nn.ReLU(),                                 #26
+    nn.ReLU(),  # 26
     nn.ReflectionPad2d((1, 1, 1, 1)),
-    nn.Conv2d(64, 3, (3, 3)),                   #28
+    nn.Conv2d(64, 3, (3, 3)),  # 28
 )
 
 
@@ -131,10 +132,10 @@ class Net(nn.Module):
         super(Net, self).__init__()
         vgg.load_state_dict(torch.load("/data/Projects/pytorch-AdaIN/models/vgg_normalised.pth"))
         enc_layers = list(vgg.children())
-        self.enc_1 = nn.Sequential(*enc_layers[:4])#.to('cuda:2')  # input -> relu1_1
-        self.enc_2 = nn.Sequential(*enc_layers[4:11])#.to('cuda:2')  # relu1_1 -> relu2_1
-        self.enc_3 = nn.Sequential(*enc_layers[11:18])#.to('cuda:2')  # relu2_1 -> relu3_1
-        self.enc_4 = nn.Sequential(*enc_layers[18:31])#.to('cuda:1')  # relu3_1 -> relu4_1
+        self.enc_1 = nn.Sequential(*enc_layers[:4])  # .to('cuda:2')  # input -> relu1_1
+        self.enc_2 = nn.Sequential(*enc_layers[4:11])  # .to('cuda:2')  # relu1_1 -> relu2_1
+        self.enc_3 = nn.Sequential(*enc_layers[11:18])  # .to('cuda:2')  # relu2_1 -> relu3_1
+        self.enc_4 = nn.Sequential(*enc_layers[18:31])  # .to('cuda:1')  # relu3_1 -> relu4_1
         self.encoder = nn.Sequential(*list(vgg.children())[:31]).to('cuda:2')
 
         pretrained_decoder = '/data/Projects/pytorch-AdaIN/experiments/gta5pcity_ambulance_alpha1wts1/decoder_iter_160000.pth.tar'
@@ -181,7 +182,7 @@ class Net(nn.Module):
                self.mse_loss(input_std, target_std)
 
     def forward_with_losses(self, content, batch_style, alpha=1.0,
-                            weights=(1,1,1,1)):
+                            weights=(1, 1, 1, 1)):
 
         assert 0 <= alpha <= 1
         if torch.cuda.is_available():
@@ -197,8 +198,8 @@ class Net(nn.Module):
         style_gather = torch.FloatTensor(1, C, H, W).zero_()
         if torch.cuda.is_available():
             style_gather = style_gather.cuda()
-        for j,wt in enumerate(interpolation_weights):
-            style_gather += wt * batch_style[j:j+1]
+        for j, wt in enumerate(interpolation_weights):
+            style_gather += wt * batch_style[j:j + 1]
         style_gather = self.encode_with_intermediate(style_gather)
 
         style_f = self.encoder(batch_style)
@@ -211,21 +212,20 @@ class Net(nn.Module):
         base_feat = adaptive_instance_normalization(content_f, style_f)
         for i, w in enumerate(interpolation_weights):
             feat = feat + w * base_feat[i:i + 1]
-        t = alpha * feat+ (1 - alpha) * content_f[0:1]
+        t = alpha * feat + (1 - alpha) * content_f[0:1]
 
         g_t = self.decoder(t)
         g_t_feats = self.encode_with_intermediate(g_t)
 
-        loss_c = self.calc_content_loss(g_t_feats[-1],t)
-        loss_s = self.calc_style_loss(g_t_feats[-1],style_gather[-1])
-        for i in range(len(interpolation_weights)-1):
-            loss_s += self.calc_style_loss(g_t_feats[i],style_gather[i])
+        loss_c = self.calc_content_loss(g_t_feats[-1], t)
+        loss_s = self.calc_style_loss(g_t_feats[-1], style_gather[-1])
+        for i in range(len(interpolation_weights) - 1):
+            loss_s += self.calc_style_loss(g_t_feats[i], style_gather[i])
 
         return loss_s, loss_c, g_t
 
-
     def forward(self, content, batch_style, alpha=1.0,
-                        weights=(1,1,1,1),save_path = None):
+                weights=(1, 1, 1, 1), save_path=None):
         assert 0 <= alpha <= 1
         if torch.cuda.is_available():
             batch_style = batch_style.to('cuda:2')
@@ -246,7 +246,7 @@ class Net(nn.Module):
         feat = torch.FloatTensor(1, C, H, W).zero_()
         if torch.cuda.is_available():
             feat = feat.to('cuda:2')
-        base_feat = adaptive_instance_normalization(content_f,style_f)
+        base_feat = adaptive_instance_normalization(content_f, style_f)
         for i, w in enumerate(interpolation_weights):
             feat = feat + w * base_feat[i:i + 1]
 
@@ -280,7 +280,7 @@ class STNet_refer(nn.Module):
         # pretrained_decoder = '/data/Projects/pytorch-AdaIN/experiments_stylewt5/decoder_iter_160000.pth.tar'
         pretrained_decoder = '/data/Projects/MaxSquareLoss/experiments/gta5pcity_ambulance_alpha1wts1_classifier_512r1024/decoder_iter_99000.pth.tar'
         decoder.load_state_dict(torch.load(pretrained_decoder))
-                # torch.load('/data/Projects/pytorch-AdaIN/experiments/{}'.format(pretrained_decoder)))
+        # torch.load('/data/Projects/pytorch-AdaIN/experiments/{}'.format(pretrained_decoder)))
         print('###################################')
         print('the decoder is from {}'.format(pretrained_decoder))
         dec_layers = list(decoder.children())
@@ -291,7 +291,7 @@ class STNet_refer(nn.Module):
         self.mse_loss = nn.MSELoss()
 
         # fix the encoder
-        for name in ['enc_1', 'enc_2', 'enc_3', 'enc_4','dec_1','dec_4','dec_7']:
+        for name in ['enc_1', 'enc_2', 'enc_3', 'enc_4', 'dec_1', 'dec_4', 'dec_7']:
             for param in getattr(self, name).parameters():
                 param.requires_grad = False
 
@@ -317,7 +317,7 @@ class STNet_refer(nn.Module):
                self.mse_loss(input_std, target_std)
 
     def forward(self, content, batch_style, alpha=1.0,
-                        weights=(1,1,1,1),save_path = None):
+                weights=(1, 1, 1, 1), save_path=None):
         assert 0 <= alpha <= 1
         if torch.cuda.is_available():
             batch_style = batch_style.to('cuda:2')
@@ -328,28 +328,27 @@ class STNet_refer(nn.Module):
         interpolation_weights = [i / sum(weights) for i in weights]
 
         content_f = self.enc_1(content)
-        content_f = self.enc_2(content_f)#.to('cuda:3'))
+        content_f = self.enc_2(content_f)  # .to('cuda:3'))
         content_f = self.enc_3(content_f)
         content_f = self.enc_4(content_f)
         torch.cuda.empty_cache()
-        style_f = self.enc_4(self.enc_3(self.enc_2(self.enc_1(batch_style))))#.to('cuda:4'))
+        style_f = self.enc_4(self.enc_3(self.enc_2(self.enc_1(batch_style))))  # .to('cuda:4'))
 
         _, C, H, W = content_f.size()
         feat = torch.FloatTensor(1, C, H, W).zero_()
         if torch.cuda.is_available():
             feat = feat.to('cuda:2')
-        base_feat = adaptive_instance_normalization(content_f,style_f)
+        base_feat = adaptive_instance_normalization(content_f, style_f)
         for i, w in enumerate(interpolation_weights):
             feat = feat + w * base_feat[i:i + 1]
 
-        t = alpha * feat+ (1 - alpha) * content_f[0:1]
+        t = alpha * feat + (1 - alpha) * content_f[0:1]
 
         g_t1 = self.dec_1(t.to('cuda:1'))
         g_t4 = self.dec_4(g_t1.to('cuda:1'))
         g_t7 = self.dec_7(g_t4.to('cuda:1'))
 
-        return  g_t7
-
+        return g_t7
 
 
 def make_grid(tensor, nrow=8, padding=2,
@@ -430,12 +429,11 @@ def make_grid(tensor, nrow=8, padding=2,
         for x in range(xmaps):
             if k >= nmaps:
                 break
-            grid.narrow(1, y * height + padding, height - padding)\
-                .narrow(2, x * width + padding, width - padding)\
+            grid.narrow(1, y * height + padding, height - padding) \
+                .narrow(2, x * width + padding, width - padding) \
                 .copy_(tensor[k])
             k = k + 1
     return grid
-
 
 
 class STNet(nn.Module):
@@ -468,7 +466,7 @@ class STNet(nn.Module):
             input = getattr(self, 'enc_{:d}'.format(i + 1))(input)
         return input
 
-    def gram_matrix(self,tensor):
+    def gram_matrix(self, tensor):
         _, d, h, w = tensor.size()
         tensor = tensor.view(d, h * w)
         return torch.mm(tensor, tensor.t())  # gram
@@ -485,7 +483,6 @@ class STNet(nn.Module):
         target_mean, target_std = calc_mean_std(target)
         return self.mse_loss(input_mean, target_mean) + \
                self.mse_loss(input_std, target_std)
-
 
     def forward(self, content, style, alpha=1.0):
         assert 0 <= alpha <= 1

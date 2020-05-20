@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" uploadOnCheckin="19100b4e-e9fd-4033-9fb2-6c92fe141cb5">
+  <component name="PublishConfigData">
     <serverData>
       <paths name="MEGVII-shiyu">
         <serverdata>
@@ -20,6 +20,5 @@
         </serverdata>
       </paths>
     </serverData>
-    <option name="myUploadOnCheckinName" value="MEGVII-shiyu" />
   </component>
 </project>

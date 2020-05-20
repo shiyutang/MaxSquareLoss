@@ -11,10 +11,11 @@ from math import ceil
 import numpy as np
 from distutils.version import LooseVersion
 from tensorboardX import SummaryWriter
-from torchvision import  transforms as ttransforms
+from torchvision import transforms as ttransforms
 
 import sys
 import random
+
 sys.path.append(os.path.abspath('.'))
 from utils.eval import Eval
 from utils.train_helper import get_model
@@ -23,20 +24,21 @@ from datasets.cityscapes_Dataset import City_Dataset, City_DataLoader, inv_prepr
 from datasets.gta5_Dataset import GTA5_DataLoader
 from datasets.synthia_Dataset import SYNTHIA_DataLoader
 
-datasets_path={
+datasets_path = {
     'Cityscapes': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes',
                    'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
-                    'image_path':'/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
-                    'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
-    'Cityscapes_ambulance_styleRetrain': {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_styleRetrain',
-                   'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
-                   'image_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_styleRetrain/leftImg8bit',
+                   'image_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
                    'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
+    'Cityscapes_ambulance_styleRetrain': {
+        'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_styleRetrain',
+        'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
+        'image_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_styleRetrain/leftImg8bit',
+        'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
     'Cityscapes_ambulance_retrain_alpha0p5wts10':
         {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_retrain_alpha0p5wts10',
-                   'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
-                   'image_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_retrain_alpha0p5wts10/leftImg8bit',
-                   'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
+         'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
+         'image_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_retrain_alpha0p5wts10/leftImg8bit',
+         'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
     'Cityscapes_ambulance_retrain_alpha1stylewt5':
         {'data_root_path': '/data/Projects/ADVENT/data/Cityscapes_ambulance_retrain_alpha1stylewt5',
          'list_path': '/data/Projects/ADVENT/data/Cityscapes/leftImg8bit',
@@ -54,12 +56,12 @@ datasets_path={
          'gt_path': '/data/Projects/ADVENT/data/Cityscapes/gtFine'},
     'gta5': {'data_root_path': '/data/Projects/ADVENT/data/GTA5',
              'list_path': '/data/Projects/ADVENT/data/GTA5',
-             'image_path':'/data/Projects/ADVENT/data/GTA5/images',
+             'image_path': '/data/Projects/ADVENT/data/GTA5/images',
              'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
     'GTA5_ambulance_styleRetrain': {'data_root_path': '/data/Projects/ADVENT/data/GTA5_ambulance_styleRetrain',
-                        'list_path': '/data/Projects/ADVENT/data/GTA5',
-                       'image_path': '/data/Projects/ADVENT/data/GTA5_ambulance_styleRetrain/images',
-                       'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
+                                    'list_path': '/data/Projects/ADVENT/data/GTA5',
+                                    'image_path': '/data/Projects/ADVENT/data/GTA5_ambulance_styleRetrain/images',
+                                    'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
     'GTA5_ambulance_gta5pcity_retrain_alpha1stylewt1':
         {'data_root_path': '/data/Projects/ADVENT/data/GTA5_ambulance_gta5pcity_retrain_alpha1stylewt1',
          'list_path': '/data/Projects/ADVENT/data/GTA5',
@@ -75,13 +77,15 @@ datasets_path={
          'list_path': '/data/Projects/ADVENT/data/GTA5',
          'image_path': '/data/Projects/ADVENT/data/GTA5_cityscapes_standard/images',
          'gt_path': '/data/Projects/ADVENT/data/GTA5/labels'},
-    'Client':{'list_path': '/data/Projects/ADVENT/data/Client',
-              'image_path': '/data/Projects/ADVENT/data/Client',},
-    'synthia': {'data_root_path': '/data/Projects/ADVENT/data/SYNTHIA', 'list_path': '/data/Projects/ADVENT/data/SYNTHIA/list',
-                    'image_path':'/data/Projects/ADVENT/data/SYNTHIA/RGB',
-                    'gt_path': '/data/Projects/ADVENT/data/GT/LABELS'},
+    'Client': {'list_path': '/data/Projects/ADVENT/data/Client',
+               'image_path': '/data/Projects/ADVENT/data/Client', },
+    'synthia': {'data_root_path': '/data/Projects/ADVENT/data/SYNTHIA',
+                'list_path': '/data/Projects/ADVENT/data/SYNTHIA/list',
+                'image_path': '/data/Projects/ADVENT/data/SYNTHIA/RGB',
+                'gt_path': '/data/Projects/ADVENT/data/GT/LABELS'},
     'NTHU': {'data_root_path': './datasets/NTHU_Datasets', 'list_path': './datasets/NTHU_list'}
-    }
+}
+
 
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
@@ -91,14 +95,16 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Unsupported value encountered.')
 
+
 ITER_MAX = 5000
+
 
 class Trainer():
     def __init__(self, args, cuda=None, train_id="None", logger=None):
         self.args = args
         self.datasets_path = datasets_path
         if torch.cuda.device_count() == 1:
-            os.environ["CUDA_VISIBLE_DEVICES"] = self.args.gpu # else 0,1,2,3
+            os.environ["CUDA_VISIBLE_DEVICES"] = self.args.gpu  # else 0,1,2,3
         self.cuda = cuda and torch.cuda.is_available()
         self.device = torch.device('cuda' if self.cuda else 'cpu')
         self.train_id = train_id
@@ -106,7 +112,7 @@ class Trainer():
 
         self.current_MIoU = 0
         self.best_MIou = 0
-        self.best_FWIou=0
+        self.best_FWIou = 0
         self.best_source_MIou = 0
         self.current_epoch = 0
         self.current_iter = 0
@@ -119,8 +125,8 @@ class Trainer():
         self.Eval = Eval(self.args.num_classes)
 
         # loss definition
-        self.loss = nn.CrossEntropyLoss(weight=None, ignore_index= -1)
-        self.loss.to(self.device) # loss 也需要去一个device
+        self.loss = nn.CrossEntropyLoss(weight=None, ignore_index=-1)
+        self.loss.to(self.device)  # loss 也需要去一个device
 
         # model
         self.model, self.params = get_model(self.args)
@@ -132,10 +138,10 @@ class Trainer():
         # optimizer
         if self.args.optim == "SGD":
             self.optimizer = torch.optim.SGD(lr=self.args.lr,
-                params=self.params,
-                momentum=self.args.momentum,
-                weight_decay=self.args.weight_decay
-            )
+                                             params=self.params,
+                                             momentum=self.args.momentum,
+                                             weight_decay=self.args.weight_decay
+                                             )
         elif self.args.optim == "Adam":
             self.optimizer = torch.optim.Adam(self.params, betas=(0.9, 0.99), weight_decay=self.args.weight_decay)
 
@@ -145,12 +151,12 @@ class Trainer():
         elif self.args.dataset == "gta5" or 'GTA5' in self.args.dataset:
             self.dataloader = GTA5_DataLoader(self.args, datasets_path=datasets_path)
         elif self.args.dataset == 'synthia':
-            self.dataloader = SYNTHIA_DataLoader(self.args,datasets_path['synthia'])
+            self.dataloader = SYNTHIA_DataLoader(self.args, datasets_path['synthia'])
 
         self.dataloader.num_iterations = min(self.dataloader.num_iterations, ITER_MAX)
         print(self.args.iter_max, self.dataloader.num_iterations)
         self.epoch_num = ceil(self.args.iter_max / self.dataloader.num_iterations) if self.args.iter_stop is None else \
-                            ceil(self.args.iter_stop / self.dataloader.num_iterations)
+            ceil(self.args.iter_stop / self.dataloader.num_iterations)
 
     def main(self):
         # load pretrained checkpoint
@@ -159,7 +165,7 @@ class Trainer():
 
         if self.args.continue_training:
             self.load_checkpoint(self.args.checkpoint_dir)
-            self.best_iter = self.current_iter         # the best iteration for target
+            self.best_iter = self.current_iter  # the best iteration for target
             self.best_source_iter = self.current_iter  # the best iteration for source
         else:
             self.current_epoch = 0
@@ -193,28 +199,29 @@ class Trainer():
                     self.best_MIou = MIoU
                     self.best_iter = self.current_iter
                     self.logger.info("=>saving a new best checkpoint...")
-                    self.save_checkpoint(self.train_id+'best.pth')
+                    self.save_checkpoint(self.train_id + 'best.pth')
                 else:
                     self.logger.info("=> The MIoU of val does't improve.")
                     self.logger.info("=> The best MIoU of val is {} at {}".format(self.best_MIou, self.best_iter))
-            
+
             self.current_epoch += 1
 
         if not self.args.client:
             self.logger.info("=>best_MIou {} at {}".format(self.best_MIou, self.best_iter))
-            self.logger.info("=>saving the final checkpoint to " + os.path.join(self.args.save_dir, self.train_id+'final.pth'))
-        self.save_checkpoint(self.train_id+'final.pth')
+            self.logger.info(
+                "=>saving the final checkpoint to " + os.path.join(self.args.save_dir, self.train_id + 'final.pth'))
+        self.save_checkpoint(self.train_id + 'final.pth')
 
     def train_one_epoch(self, epoch=None):
         tqdm_epoch = tqdm(self.dataloader.data_loader, total=self.dataloader.num_iterations,
-                          desc="Train Epoch-{}-total-{}".format(self.current_epoch+1, self.epoch_num))
+                          desc="Train Epoch-{}-total-{}".format(self.current_epoch + 1, self.epoch_num))
         self.logger.info("Training one epoch...")
         self.Eval.reset()  # set confusion matrix to zeros
 
         train_loss = []
         loss_seg_value_2 = 0
         iter_num = self.dataloader.num_iterations
-        
+
         if self.args.freeze_bn:
             self.model.eval()
             self.logger.info("freeze bacth normalization successfully!")
@@ -242,10 +249,10 @@ class Trainer():
             if isinstance(pred, tuple):
                 pred_2 = pred[1]
                 pred = pred[0]
-            
+
             # loss
             cur_loss = self.loss(pred, y)
-            
+
             if self.args.multi:
                 loss_2 = self.args.lambda_seg * self.loss(pred_2, y)
                 cur_loss += loss_2
@@ -261,10 +268,11 @@ class Trainer():
             if batch_idx % 1000 == 0:
                 if self.args.multi:
                     self.logger.info("The train loss of epoch{}-batch-{}:{};{}".format(self.current_epoch,
-                                                                            batch_idx, cur_loss.item(), loss_2.item()))
+                                                                                       batch_idx, cur_loss.item(),
+                                                                                       loss_2.item()))
                 else:
                     self.logger.info("The train loss of epoch{}-batch-{}:{}".format(self.current_epoch,
-                                                                            batch_idx, cur_loss.item()))
+                                                                                    batch_idx, cur_loss.item()))
 
             if np.isnan(float(cur_loss.item())):
                 raise ValueError('Loss is nan during training...')
@@ -282,14 +290,15 @@ class Trainer():
         tqdm_epoch.close()
 
     def log_one_train_epoch(self, x, label, argpred, train_loss):
-        #show train image on tensorboard
-        images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images, numpy_transform=self.args.numpy_transform)
+        # show train image on tensorboard
+        images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images,
+                                    numpy_transform=self.args.numpy_transform)
         labels_colors = decode_labels(label, self.args.show_num_images)
         preds_colors = decode_labels(argpred, self.args.show_num_images)
         for index, (img, lab, color_pred) in enumerate(zip(images_inv, labels_colors, preds_colors)):
-            self.writer.add_image('train/'+ str(index)+'/Images', img, self.current_epoch)
-            self.writer.add_image('train/'+ str(index)+'/Labels', lab, self.current_epoch)
-            self.writer.add_image('train/'+ str(index)+'/preds', color_pred, self.current_epoch)
+            self.writer.add_image('train/' + str(index) + '/Images', img, self.current_epoch)
+            self.writer.add_image('train/' + str(index) + '/Labels', lab, self.current_epoch)
+            self.writer.add_image('train/' + str(index) + '/preds', color_pred, self.current_epoch)
 
         if self.args.class_16:
             PA = self.Eval.Pixel_Accuracy()
@@ -303,13 +312,13 @@ class Trainer():
             FWIoU = self.Eval.Frequency_Weighted_Intersection_over_Union()
 
         self.logger.info('\nEpoch:{}, train PA1:{}, MPA1:{}, MIoU1:{}, FWIoU1:{}'.format(self.current_epoch, PA, MPA,
-                                                                                       MIoU, FWIoU))
+                                                                                         MIoU, FWIoU))
         self.writer.add_scalar('train_PA', PA, self.current_epoch)
         self.writer.add_scalar('train_MPA', MPA, self.current_epoch)
         self.writer.add_scalar('train_MIoU', MIoU, self.current_epoch)
         self.writer.add_scalar('train_FWIoU', FWIoU, self.current_epoch)
 
-        tr_loss = sum(train_loss)/len(train_loss) if isinstance(train_loss, list) else train_loss
+        tr_loss = sum(train_loss) / len(train_loss) if isinstance(train_loss, list) else train_loss
         self.writer.add_scalar('train_loss', tr_loss, self.current_epoch)
         tqdm.write("The average loss of train epoch-{}-:{}".format(self.current_epoch, tr_loss))
 
@@ -344,13 +353,13 @@ class Trainer():
     def rectification(self, maxpred, argpred, id, x0, y0):
         #### crop & resize then Transfer ###
         ## x_org torch.Size([1, 3, 928, 1856])
-        x_crop = self.x_org[:, :, y0:int(y0+0.5*self.x_height), x0:int(x0+0.5*self.x_width)]
+        x_crop = self.x_org[:, :, y0:int(y0 + 0.5 * self.x_height), x0:int(x0 + 0.5 * self.x_width)]
         x_crop = F.interpolate(x_crop, size=[self.x_height, self.x_width])
         x_new = self.network(x_crop, self.batch_style)
         # self.save_tensor_as_Image(x, '/data/result', 'x_928r1856_trans_{}.png'.format(id)) ## save transfer result
 
         ### segmentation ####
-        x_new  = self.seg_transform(x_new) # x is 1,3,640,1280
+        x_new = self.seg_transform(x_new)  # x is 1,3,640,1280
         if self.cuda:
             x_new = x_new.to('cuda:0')
         new_pred = self.model(x_new)  ## pred 1,19,640,1280
@@ -359,14 +368,17 @@ class Trainer():
 
         ### process the segmentation result of small map ##
         new_pred = F.interpolate(new_pred, size=[int(0.5 * self.args.seg_size[1]), int(0.5 * self.args.seg_size[0])])
-        new_pred = new_pred.data.cpu().numpy() # (1, 19, 320, 640)
-        new_argpred = np.argmax(new_pred, axis=1) # 1,320,640
+        new_pred = new_pred.data.cpu().numpy()  # (1, 19, 320, 640)
+        new_argpred = np.argmax(new_pred, axis=1)  # 1,320,640
         new_maxpred = np.amax(new_pred, axis=1)
         # maxpred.shape  (1, 640, 1280)
 
-        segy0,segx0 = int((y0/self.x_height)*self.args.seg_size[1]),int((x0/self.x_width)*self.args.seg_size[0]) ## new coords in segmap
-        mask = new_maxpred > maxpred[0,segy0:int(segy0+0.5*self.args.seg_size[1]),segx0:int(segx0+0.5*self.args.seg_size[0])] # (1, 320, 640)
-        argpred[:,segy0:int(segy0+0.5*self.args.seg_size[1]),segx0:int(segx0+0.5*self.args.seg_size[0])][mask] = new_argpred[mask] ## argpred(1, 640, 1280) indexed(320, 640)
+        segy0, segx0 = int((y0 / self.x_height) * self.args.seg_size[1]), int(
+            (x0 / self.x_width) * self.args.seg_size[0])  ## new coords in segmap
+        mask = new_maxpred > maxpred[0, segy0:int(segy0 + 0.5 * self.args.seg_size[1]),
+                             segx0:int(segx0 + 0.5 * self.args.seg_size[0])]  # (1, 320, 640)
+        argpred[:, segy0:int(segy0 + 0.5 * self.args.seg_size[1]), segx0:int(segx0 + 0.5 * self.args.seg_size[0])][
+            mask] = new_argpred[mask]  ## argpred(1, 640, 1280) indexed(320, 640)
 
         ##
         images_inv = inv_preprocess(x_new.clone().cpu(), 1, numpy_transform=self.args.numpy_transform)
@@ -395,12 +407,13 @@ class Trainer():
                 pred = pred.data.cpu().numpy()
                 argpred = np.argmax(pred, axis=1)
 
-                #show val result on tensorboard
-                images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images, numpy_transform=self.args.numpy_transform)
+                # show val result on tensorboard
+                images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images,
+                                            numpy_transform=self.args.numpy_transform)
                 preds_colors = decode_labels(argpred, self.args.show_num_images)
                 for index, (img, color_pred) in enumerate(zip(images_inv, preds_colors)):
-                    self.writer.add_image(str(i)+'/Images', img, self.current_epoch)
-                    self.writer.add_image(str(i)+'/preds', color_pred, self.current_epoch)
+                    self.writer.add_image(str(i) + '/Images', img, self.current_epoch)
+                    self.writer.add_image(str(i) + '/preds', color_pred, self.current_epoch)
 
             tqdm_batch.close()
 
@@ -413,7 +426,7 @@ class Trainer():
             if mode == 'val':
                 self.model.eval()
             i = 0
-            for x_org, y, id  in tqdm_batch:
+            for x_org, y, id in tqdm_batch:
                 if self.args.rectification:
                     self.x_org = x_org
                     _, __, self.x_height, self.x_width = x_org.shape
@@ -442,7 +455,7 @@ class Trainer():
                 label = y.cpu().numpy()
 
                 pred = pred.data.cpu().numpy()
-                maxpred =np.amax(pred, axis=1)
+                maxpred = np.amax(pred, axis=1)
                 argpred = np.argmax(pred, axis=1)
 
                 if self.args.rectification:
@@ -454,34 +467,40 @@ class Trainer():
                         (x0 / self.x_width) * self.args.seg_size[0])
 
                     # prediction before rectification
-                    preds_colors_bs = decode_labels(argpred[:,segy0:int(segy0+0.5*self.args.seg_size[1]),segx0:int(segx0+0.5*self.args.seg_size[0])],1)
+                    preds_colors_bs = decode_labels(argpred[:, segy0:int(segy0 + 0.5 * self.args.seg_size[1]),
+                                                    segx0:int(segx0 + 0.5 * self.args.seg_size[0])], 1)
                     self.writer.add_image('{}/pred_before'.format(id.item()), preds_colors_bs, self.current_epoch)
 
                     argpred = self.rectification(maxpred, argpred, id.item(), 0, y0)
-                    argpred = self.rectification(maxpred, argpred,id.item(), x0, y0)
+                    argpred = self.rectification(maxpred, argpred, id.item(), x0, y0)
 
-                    preds_colors_after = decode_labels(argpred[:,segy0:int(segy0+0.5*self.args.seg_size[1]),segx0:int(segx0+0.5*self.args.seg_size[0])],1)
+                    preds_colors_after = decode_labels(argpred[:, segy0:int(segy0 + 0.5 * self.args.seg_size[1]),
+                                                       segx0:int(segx0 + 0.5 * self.args.seg_size[0])], 1)
                     self.writer.add_image('{}/pred_after'.format(id.item()), preds_colors_after, self.current_epoch)
 
                     images_inv_bf = inv_preprocess(
-                        x[:, :, segy0:int(segy0+0.5*self.args.seg_size[1]),segx0:int(segx0+0.5*self.args.seg_size[0])].clone().cpu(), 1,
-                        numpy_transform=self.args.numpy_transform) #([1, 3, 464, 352]
-                    print('images_inv_bf.shape',images_inv_bf.shape)
+                        x[:, :, segy0:int(segy0 + 0.5 * self.args.seg_size[1]),
+                        segx0:int(segx0 + 0.5 * self.args.seg_size[0])].clone().cpu(), 1,
+                        numpy_transform=self.args.numpy_transform)  # ([1, 3, 464, 352]
+                    print('images_inv_bf.shape', images_inv_bf.shape)
                     self.writer.add_image('{}/transimg_before'.format(id.item()), images_inv_bf, self.current_epoch)
 
-                    labels_colors = decode_labels(label[:, segy0:int(segy0+0.5*self.args.seg_size[1]), segx0:int(segx0+0.5*self.args.seg_size[0])], 1)
-                    self.writer.add_image('{}/label'.format(id.item()), labels_colors, self.current_epoch) # label # (1, 640, 1280)
+                    labels_colors = decode_labels(label[:, segy0:int(segy0 + 0.5 * self.args.seg_size[1]),
+                                                  segx0:int(segx0 + 0.5 * self.args.seg_size[0])], 1)
+                    self.writer.add_image('{}/label'.format(id.item()), labels_colors,
+                                          self.current_epoch)  # label # (1, 640, 1280)
                 self.Eval.add_batch(label, argpred)
                 i += 1
 
-            #show val result on tensorboard
-            images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images, numpy_transform=self.args.numpy_transform)
+            # show val result on tensorboard
+            images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images,
+                                        numpy_transform=self.args.numpy_transform)
             labels_colors = decode_labels(label, self.args.show_num_images)
             preds_colors = decode_labels(argpred, self.args.show_num_images)
             for index, (img, lab, color_pred) in enumerate(zip(images_inv, labels_colors, preds_colors)):
-                self.writer.add_image(str(index)+'/Images', img, self.current_epoch)
-                self.writer.add_image(str(index)+'/Labels', lab, self.current_epoch)
-                self.writer.add_image(str(index)+'/preds', color_pred, self.current_epoch)
+                self.writer.add_image(str(index) + '/Images', img, self.current_epoch)
+                self.writer.add_image(str(index) + '/Labels', lab, self.current_epoch)
+                self.writer.add_image(str(index) + '/preds', color_pred, self.current_epoch)
 
             if self.args.class_16:
                 def val_info(Eval, name):
@@ -492,17 +511,21 @@ class Trainer():
                     PC_16, PC_13 = Eval.Mean_Precision()
                     print("########## Eval{} ############".format(name))
 
-                    self.logger.info('\nEpoch:{:.3f}, {} PA:{:.3f}, MPA_16:{:.3f}, MIoU_16:{:.3f}, FWIoU_16:{:.3f}, PC_16:{:.3f}'.format(self.current_epoch, name, PA, MPA_16,
-                                                                                                MIoU_16, FWIoU_16, PC_16))
-                    self.logger.info('\nEpoch:{:.3f}, {} PA:{:.3f}, MPA_13:{:.3f}, MIoU_13:{:.3f}, FWIoU_13:{:.3f}, PC_13:{:.3f}'.format(self.current_epoch, name, PA, MPA_13,
-                                                                                                MIoU_13, FWIoU_13, PC_13))
-                    self.writer.add_scalar('PA'+name, PA, self.current_epoch)
-                    self.writer.add_scalar('MPA_16'+name, MPA_16, self.current_epoch)
-                    self.writer.add_scalar('MIoU_16'+name, MIoU_16, self.current_epoch)
-                    self.writer.add_scalar('FWIoU_16'+name, FWIoU_16, self.current_epoch)
-                    self.writer.add_scalar('MPA_13'+name, MPA_13, self.current_epoch)
-                    self.writer.add_scalar('MIoU_13'+name, MIoU_13, self.current_epoch)
-                    self.writer.add_scalar('FWIoU_13'+name, FWIoU_13, self.current_epoch)
+                    self.logger.info(
+                        '\nEpoch:{:.3f}, {} PA:{:.3f}, MPA_16:{:.3f}, MIoU_16:{:.3f}, FWIoU_16:{:.3f}, PC_16:{:.3f}'.format(
+                            self.current_epoch, name, PA, MPA_16,
+                            MIoU_16, FWIoU_16, PC_16))
+                    self.logger.info(
+                        '\nEpoch:{:.3f}, {} PA:{:.3f}, MPA_13:{:.3f}, MIoU_13:{:.3f}, FWIoU_13:{:.3f}, PC_13:{:.3f}'.format(
+                            self.current_epoch, name, PA, MPA_13,
+                            MIoU_13, FWIoU_13, PC_13))
+                    self.writer.add_scalar('PA' + name, PA, self.current_epoch)
+                    self.writer.add_scalar('MPA_16' + name, MPA_16, self.current_epoch)
+                    self.writer.add_scalar('MIoU_16' + name, MIoU_16, self.current_epoch)
+                    self.writer.add_scalar('FWIoU_16' + name, FWIoU_16, self.current_epoch)
+                    self.writer.add_scalar('MPA_13' + name, MPA_13, self.current_epoch)
+                    self.writer.add_scalar('MIoU_13' + name, MIoU_13, self.current_epoch)
+                    self.writer.add_scalar('FWIoU_13' + name, FWIoU_13, self.current_epoch)
                     return PA, MPA_13, MIoU_13, FWIoU_13
             else:
                 def val_info(Eval, name):
@@ -513,12 +536,14 @@ class Trainer():
                     PC = Eval.Mean_Precision()
                     print("########## Eval{} ############".format(name))
 
-                    self.logger.info('\nEpoch:{:.3f}, {} PA1:{:.3f}, MPA1:{:.3f}, MIoU1:{:.3f}, FWIoU1:{:.3f}, PC:{:.3f}'.format(self.current_epoch, name, PA, MPA,
-                                                                                                MIoU, FWIoU, PC))
-                    self.writer.add_scalar('PA'+name, PA, self.current_epoch)
-                    self.writer.add_scalar('MPA'+name, MPA, self.current_epoch)
-                    self.writer.add_scalar('MIoU'+name, MIoU, self.current_epoch)
-                    self.writer.add_scalar('FWIoU'+name, FWIoU, self.current_epoch)
+                    self.logger.info(
+                        '\nEpoch:{:.3f}, {} PA1:{:.3f}, MPA1:{:.3f}, MIoU1:{:.3f}, FWIoU1:{:.3f}, PC:{:.3f}'.format(
+                            self.current_epoch, name, PA, MPA,
+                            MIoU, FWIoU, PC))
+                    self.writer.add_scalar('PA' + name, PA, self.current_epoch)
+                    self.writer.add_scalar('MPA' + name, MPA, self.current_epoch)
+                    self.writer.add_scalar('MIoU' + name, MIoU, self.current_epoch)
+                    self.writer.add_scalar('FWIoU' + name, FWIoU, self.current_epoch)
                     return PA, MPA, MIoU, FWIoU
 
             PA, MPA, MIoU, FWIoU = val_info(self.Eval, "")
@@ -539,7 +564,7 @@ class Trainer():
                     x = self.cropTrans(x)
                 else:
                     x = self.network(x, self.batch_style)
-                x,y = self.seg_transform(x, y)
+                x, y = self.seg_transform(x, y)
 
                 if self.cuda:
                     x, y = x.to('cuda:0'), y.to(device='cuda:0', dtype=torch.long)
@@ -563,14 +588,15 @@ class Trainer():
                 if i == self.dataloader.valid_iterations:
                     break
 
-            #show val result on tensorboard
-            images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images, numpy_transform=self.args.numpy_transform)
+            # show val result on tensorboard
+            images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images,
+                                        numpy_transform=self.args.numpy_transform)
             labels_colors = decode_labels(label, self.args.show_num_images)
             preds_colors = decode_labels(argpred, self.args.show_num_images)
             for index, (img, lab, color_pred) in enumerate(zip(images_inv, labels_colors, preds_colors)):
-                self.writer.add_image('source_eval/'+str(index)+'/Images', img, self.current_epoch)
-                self.writer.add_image('source_eval/'+str(index)+'/Labels', lab, self.current_epoch)
-                self.writer.add_image('source_eval/'+str(index)+'/preds', color_pred, self.current_epoch)
+                self.writer.add_image('source_eval/' + str(index) + '/Images', img, self.current_epoch)
+                self.writer.add_image('source_eval/' + str(index) + '/Labels', lab, self.current_epoch)
+                self.writer.add_image('source_eval/' + str(index) + '/preds', color_pred, self.current_epoch)
 
             if self.args.class_16:
                 def source_val_info(Eval, name):
@@ -581,17 +607,21 @@ class Trainer():
                     PC_16, PC_13 = Eval.Mean_Precision()
                     print("########## Source Eval{} ############".format(name))
 
-                    self.logger.info('\nEpoch:{:.3f}, source {} PA:{:.3f}, MPA_16:{:.3f}, MIoU_16:{:.3f}, FWIoU_16:{:.3f}, PC_16:{:.3f}'.format(self.current_epoch, name, PA, MPA_16,
-                                                                                                MIoU_16, FWIoU_16, PC_16))
-                    self.logger.info('\nEpoch:{:.3f}, source {} PA:{:.3f}, MPA_13:{:.3f}, MIoU_13:{:.3f}, FWIoU_13:{:.3f}, PC_13:{:.3f}'.format(self.current_epoch, name, PA, MPA_13,
-                                                                                                MIoU_13, FWIoU_13, PC_13))
-                    self.writer.add_scalar('source_PA'+name, PA, self.current_epoch)
-                    self.writer.add_scalar('source_MPA_16'+name, MPA_16, self.current_epoch)
-                    self.writer.add_scalar('source_MIoU_16'+name, MIoU_16, self.current_epoch)
-                    self.writer.add_scalar('source_FWIoU_16'+name, FWIoU_16, self.current_epoch)
-                    self.writer.add_scalar('source_MPA_13'+name, MPA_13, self.current_epoch)
-                    self.writer.add_scalar('source_MIoU_13'+name, MIoU_13, self.current_epoch)
-                    self.writer.add_scalar('source_FWIoU_13'+name, FWIoU_13, self.current_epoch)
+                    self.logger.info(
+                        '\nEpoch:{:.3f}, source {} PA:{:.3f}, MPA_16:{:.3f}, MIoU_16:{:.3f}, FWIoU_16:{:.3f}, PC_16:{:.3f}'.format(
+                            self.current_epoch, name, PA, MPA_16,
+                            MIoU_16, FWIoU_16, PC_16))
+                    self.logger.info(
+                        '\nEpoch:{:.3f}, source {} PA:{:.3f}, MPA_13:{:.3f}, MIoU_13:{:.3f}, FWIoU_13:{:.3f}, PC_13:{:.3f}'.format(
+                            self.current_epoch, name, PA, MPA_13,
+                            MIoU_13, FWIoU_13, PC_13))
+                    self.writer.add_scalar('source_PA' + name, PA, self.current_epoch)
+                    self.writer.add_scalar('source_MPA_16' + name, MPA_16, self.current_epoch)
+                    self.writer.add_scalar('source_MIoU_16' + name, MIoU_16, self.current_epoch)
+                    self.writer.add_scalar('source_FWIoU_16' + name, FWIoU_16, self.current_epoch)
+                    self.writer.add_scalar('source_MPA_13' + name, MPA_13, self.current_epoch)
+                    self.writer.add_scalar('source_MIoU_13' + name, MIoU_13, self.current_epoch)
+                    self.writer.add_scalar('source_FWIoU_13' + name, FWIoU_13, self.current_epoch)
                     return PA, MPA_13, MIoU_13, FWIoU_13
             else:
                 def source_val_info(Eval, name):
@@ -601,16 +631,18 @@ class Trainer():
                     FWIoU = Eval.Frequency_Weighted_Intersection_over_Union()
                     PC = Eval.Mean_Precision()
 
-                    self.writer.add_scalar('source_PA'+name, PA, self.current_epoch)
-                    self.writer.add_scalar('source_MPA'+name, MPA, self.current_epoch)
-                    self.writer.add_scalar('source_MIoU'+name, MIoU, self.current_epoch)
-                    self.writer.add_scalar('source_FWIoU'+name, FWIoU, self.current_epoch)
+                    self.writer.add_scalar('source_PA' + name, PA, self.current_epoch)
+                    self.writer.add_scalar('source_MPA' + name, MPA, self.current_epoch)
+                    self.writer.add_scalar('source_MIoU' + name, MIoU, self.current_epoch)
+                    self.writer.add_scalar('source_FWIoU' + name, FWIoU, self.current_epoch)
                     print("########## Source Eval{} ############".format(name))
 
-                    self.logger.info('\nEpoch:{:.3f}, source {} PA1:{:.3f}, MPA1:{:.3f}, MIoU1:{:.3f}, FWIoU1:{:.3f}, PC:{:.3f}'.format(self.current_epoch, name, PA, MPA,
-                                                                                                MIoU, FWIoU, PC))
+                    self.logger.info(
+                        '\nEpoch:{:.3f}, source {} PA1:{:.3f}, MPA1:{:.3f}, MIoU1:{:.3f}, FWIoU1:{:.3f}, PC:{:.3f}'.format(
+                            self.current_epoch, name, PA, MPA,
+                            MIoU, FWIoU, PC))
                     return PA, MPA, MIoU, FWIoU
-        
+
             PA, MPA, MIoU, FWIoU = source_val_info(self.Eval, "")
             tqdm_batch.close()
 
@@ -619,10 +651,11 @@ class Trainer():
             self.best_source_MIou = MIoU
             self.best_source_iter = self.current_iter
             self.logger.info("=>saving a new best source checkpoint...")
-            self.save_checkpoint(self.train_id+'source_best.pth')
+            self.save_checkpoint(self.train_id + 'source_best.pth')
         else:
             self.logger.info("=> The source MIoU of val does't improve.")
-            self.logger.info("=> The best source MIoU of val is {} at {}".format(self.best_source_MIou, self.best_source_iter))
+            self.logger.info(
+                "=> The best source MIoU of val is {} at {}".format(self.best_source_MIou, self.best_source_iter))
 
         return PA, MPA, MIoU, FWIoU
 
@@ -635,13 +668,13 @@ class Trainer():
         :return:
         """
         filename = os.path.join(self.args.save_dir, filename)
-        if torch.cuda.device_count()>1:
+        if torch.cuda.device_count() > 1:
             statedict = self.model.module.state_dict()
         else:
             statedict = self.model.state_dict()
         state = {'epoch': self.current_epoch + 1, 'iteration': self.current_iter,
                  'state_dict': statedict, 'optimizer': self.optimizer.state_dict(),
-                 'best_MIou':self.best_MIou}
+                 'best_MIou': self.best_MIou}
         torch.save(state, filename)
 
     def load_checkpoint(self, filename):
@@ -658,7 +691,7 @@ class Trainer():
             else:
                 self.model.module.load_state_dict(checkpoint['state_dict'])
 
-            self.logger.info("Checkpoint loaded successfully from "+filename)
+            self.logger.info("Checkpoint loaded successfully from " + filename)
 
             if "optimizer" in checkpoint:
                 self.optimizer.load_state_dict(checkpoint["optimizer"])
@@ -670,8 +703,8 @@ class Trainer():
             self.logger.info("No checkpoint exists from '{}'. Skipping...".format(self.args.checkpoint_dir))
             self.logger.info("**First time to train**")
 
-    def poly_lr_scheduler(self, optimizer, init_lr=None, iter=None, 
-                            max_iter=None, power=None):
+    def poly_lr_scheduler(self, optimizer, init_lr=None, iter=None,
+                          max_iter=None, power=None):
         init_lr = self.args.lr if init_lr is None else init_lr
         iter = self.current_iter if iter is None else iter
         max_iter = self.args.iter_max if max_iter is None else max_iter
@@ -697,11 +730,11 @@ def add_train_args(arg_parser):
     arg_parser.add_argument('--list_path', type=str, default=None,
                             help="the root path of dataset")
     arg_parser.add_argument('--checkpoint_dir',
-                            default=#'/data/Projects/MaxSquareLoss/log/train/trans_gta5_pretrain_add_multi/IW_MS_UNION_upseg_1832_strain_1e-3_add_multi/GTA52Cityscapes_IW_maxsquarebest.pth',
-                                     # "./log/train/trans_gta5_pretrain_add_multi/IW_MS_trans_plateau/gta52cityscapes_IW_maxsquaremIOUbest_epoch_25.pth",
-                                    '/data/Projects/MaxSquareLoss/log/train/add_multi_gta_only/add_multibest.pth',
+                            default=  # '/data/Projects/MaxSquareLoss/log/train/trans_gta5_pretrain_add_multi/IW_MS_UNION_upseg_1832_strain_1e-3_add_multi/GTA52Cityscapes_IW_maxsquarebest.pth',
+                            # "./log/train/trans_gta5_pretrain_add_multi/IW_MS_trans_plateau/gta52cityscapes_IW_maxsquaremIOUbest_epoch_25.pth",
+                            '/data/Projects/MaxSquareLoss/log/train/add_multi_gta_only/add_multibest.pth',
                             help="the path of ckpt file")
-    arg_parser.add_argument("--save_dir",default="./log/train/add_multi_cityscapes_only/train_city",
+    arg_parser.add_argument("--save_dir", default="./log/train/add_multi_cityscapes_only/train_city",
                             help="the path that you want to save all the output")
 
     # Model related arguments
@@ -716,14 +749,14 @@ def add_train_args(arg_parser):
     arg_parser.add_argument('--continue_training', type=str2bool, default=False,
                             help="whether to continue training ")
     arg_parser.add_argument('--show_num_images', type=int, default=2,
-                        help="show how many images during validate")
+                            help="show how many images during validate")
 
     # train related arguments
     arg_parser.add_argument('--seed', default=12345, type=int,
                             help='random seed')
     arg_parser.add_argument('--gpu', type=str, default="0",
                             help=" the num of gpu")
-    arg_parser.add_argument("--batch_size",default=1,type=int,
+    arg_parser.add_argument("--batch_size", default=1, type=int,
                             help="directly set batch size")
     arg_parser.add_argument("--exp_tag", type=str, default="test",
                             help="Set tag for each experiment")
@@ -731,11 +764,11 @@ def add_train_args(arg_parser):
     # dataset related arguments
     arg_parser.add_argument('--dataset', default='Cityscapes', type=str,
                             help='dataset choice')
-    arg_parser.add_argument('--base_size', default="1856,928", type=str, # for random crop
+    arg_parser.add_argument('--base_size', default="1856,928", type=str,  # for random crop
                             help='base size of source image')
     arg_parser.add_argument('--crop_size', default="928,464", type=str,
                             help='crop size of source image')
-    arg_parser.add_argument('--target_base_size', default="1856,928", type=str, # for random crop
+    arg_parser.add_argument('--target_base_size', default="1856,928", type=str,  # for random crop
                             help='base size of target image')
     arg_parser.add_argument('--target_crop_size', default="928,464", type=str,
                             help='crop size of target image')
@@ -752,13 +785,13 @@ def add_train_args(arg_parser):
     arg_parser.add_argument('--random_mirror', default=True, type=str2bool,
                             help='add random_mirror')
     arg_parser.add_argument('--random_crop', default=False, type=str2bool,
-                        help='add random_crop')
+                            help='add random_crop')
     arg_parser.add_argument('--resize', default=True, type=str2bool,
-                        help='resize')
+                            help='resize')
     arg_parser.add_argument('--gaussian_blur', default=False, type=str2bool,
-                        help='add gaussian_blur')
+                            help='add gaussian_blur')
     arg_parser.add_argument('--numpy_transform', default=True, type=str2bool,
-                        help='transform pic using numpy with Means and BGR CHW')
+                            help='transform pic using numpy with Means and BGR CHW')
 
     # optimization related arguments
 
@@ -788,12 +821,11 @@ def add_train_args(arg_parser):
     arg_parser.add_argument('--DA', type=bool, default=False,
                             help='if doing domain adaptation')
 
-
     # multi-level output
     arg_parser.add_argument('--multi', default=True, type=str2bool,
-                        help='output model middle feature')
+                            help='output model middle feature')
     arg_parser.add_argument('--lambda_seg', type=float, default=0.1,
-                        help="lambda_seg of middle output")
+                            help="lambda_seg of middle output")
     return arg_parser
 
 
@@ -806,7 +838,7 @@ def init_args(args):
 
     crop_size = args.crop_size.split(',')
     base_size = args.base_size.split(',')
-    if len(crop_size)==1:
+    if len(crop_size) == 1:
         args.crop_size = int(crop_size[0])
         args.base_size = int(base_size[0])
     else:
@@ -815,7 +847,7 @@ def init_args(args):
 
     target_crop_size = args.target_crop_size.split(',')
     target_base_size = args.target_base_size.split(',')
-    if len(target_crop_size)==1:
+    if len(target_crop_size) == 1:
         args.target_crop_size = int(target_crop_size[0])
         args.target_base_size = int(target_base_size[0])
     else:
@@ -827,22 +859,22 @@ def init_args(args):
         args.list_path = datasets_path[args.dataset]['list_path']
         args.image_filepath = datasets_path[args.dataset]['image_path']
         args.gt_filepath = datasets_path[args.dataset]['gt_path']
-    
+
     args.class_16 = True if args.num_classes == 16 else False
     args.class_13 = True if args.num_classes == 13 else False
 
     # logger configure
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
-    fh = logging.FileHandler(os.path.join(args.save_dir, train_id+'_train_log.txt'))
+    fh = logging.FileHandler(os.path.join(args.save_dir, train_id + '_train_log.txt'))
     ch = logging.StreamHandler()
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     fh.setFormatter(formatter)
     ch.setFormatter(formatter)
     logger.addHandler(fh)
     logger.addHandler(ch)
-    
-    #set seed
+
+    # set seed
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.random.manual_seed(args.seed)
