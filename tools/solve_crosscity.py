@@ -39,8 +39,6 @@ class CrossCityTrainer(Trainer):
                                 data_root_path=args.source_data_path,
                                 list_path=args.source_list_path,
                                 split=args.split,
-                                base_size=args.base_size,
-                                crop_size=args.crop_size,
                                 class_13=args.class_13)
         self.source_dataloader = data.DataLoader(source_data_set,
                                                batch_size=self.args.batch_size,

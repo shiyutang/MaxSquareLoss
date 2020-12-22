@@ -103,57 +103,6 @@ class resultEvaluater(object):
 
         self.model.to(self.device)
 
-        ## source train loader
-        if 'GTA5' in self.styles_source[0]:
-            print('build source_train',self.styles_source)
-            source_trans_data_set_train = GTA5_Dataset(args,
-                                   data_root_path=self.datasets_path[self.styles_source[0]]['data_root_path'],
-                                   list_path=self.datasets_path[self.styles_source[0]]['list_path'],
-                                   gt_path=self.datasets_path[self.styles_source[0]]['gt_path'],
-                                   split='train',
-                                   base_size=args.base_size,
-                                   crop_size=args.crop_size)
-
-            ## source validation loader
-            source_trans_data_set_val = GTA5_Dataset(args,
-                                           data_root_path=self.datasets_path[self.styles_source[0]]['data_root_path'],
-                                           list_path=self.datasets_path[self.styles_source[0]]['list_path'],
-                                           gt_path=self.datasets_path[self.styles_source[0]]['gt_path'],
-                                           split='test',
-                                           base_size=args.base_size,
-                                           crop_size=args.crop_size)
-
-        elif 'SYNTHIA' in self.styles_source[0]:
-            source_trans_data_set_train = SYNTHIA_Dataset(args,
-                                   data_root_path=self.datasets_path[self.styles_source[0]]['data_root_path'],
-                                   list_path=self.datasets_path[self.styles_source[0]]['list_path'],
-                                   split='train',
-                                   base_size=args.base_size,
-                                   crop_size=args.crop_size)
-
-
-            ## source validation loader
-            source_trans_data_set_val = SYNTHIA_Dataset(args,
-                                           data_root_path=self.datasets_path[self.styles_source[0]]['data_root_path'],
-                                           list_path=self.datasets_path[self.styles_source[0]]['list_path'],
-                                           split='val',
-                                           base_size=args.base_size,
-                                           crop_size=args.crop_size)
-
-        self.source_trans_dataloader = \
-            data.DataLoader(source_trans_data_set_train,
-                           batch_size=self.args.batch_size,
-                           shuffle=True,
-                           num_workers=self.args.data_loader_workers,
-                           pin_memory=self.args.pin_memory,
-                           drop_last=True)
-
-        self.source_trans_val_dataloader = data.DataLoader(source_trans_data_set_val,
-                                                           batch_size=self.args.batch_size,
-                                                           shuffle=False,
-                                                           num_workers=self.args.data_loader_workers,
-                                                           pin_memory=self.args.pin_memory,
-                                                           drop_last=True)
         ## target dataset train and validation
         target_trans_data_set =\
             City_Dataset(args,
@@ -175,7 +124,7 @@ class resultEvaluater(object):
                        data_root_path=self.datasets_path[self.styles_target[0]]['data_root_path'],
                        list_path=self.datasets_path[self.styles_target[0]]['list_path'],
                        gt_path=self.datasets_path[self.styles_target[0]]['gt_path'],
-                       split='val',
+                       split='val_sp',
                        base_size=args.target_base_size,
                        crop_size=args.target_crop_size,
                        class_16=args.class_16)
@@ -186,9 +135,9 @@ class resultEvaluater(object):
                                                      pin_memory=self.args.pin_memory,
                                                      drop_last=True)
 
-        self.val_loader = self.source_trans_val_dataloader
+        self.val_loader = self.target_val_dataloader
 
-        self.valid_iterations = (len(source_trans_data_set_val) + self.args.batch_size) // self.args.batch_size
+        self.valid_iterations = (len(target_trans_data_set) + self.args.batch_size) // self.args.batch_size
 
     def load_checkpoint(self, filename):
         try:
@@ -214,10 +163,10 @@ class resultEvaluater(object):
     def main(self):
         # load pretrained checkpoint
         if self.args.checkpoint_dir is not None:
-            self.args.pretrained_ckpt_file = os.path.join(self.args.checkpoint_dir, self.restore_id + 'best.pth')
-            self.load_checkpoint(self.args.pretrained_ckpt_file)
+            # self.args.pretrained_ckpt_file = os.path.join(self.args.checkpoint_dir, self.restore_id + 'best.pth')
+            self.load_checkpoint(self.args.checkpoint_dir)
 
-        self.getvalResult(self.resultOutPath,0) # check image summary
+        self.getvalResult(self.resultOutPath, 0.5) # check image summary
 
     def getvalResult(self, outputPath, threshold):
         self.logger.info('\nget result one epoch...')
@@ -234,8 +183,7 @@ class resultEvaluater(object):
             return PA, MPA, MIoU, FWIoU, IOUS
 
         with torch.no_grad():
-            tqdm_batch = tqdm(self.val_loader, total=self.valid_iterations,
-                              desc="Val Epoch-{}-".format(self.current_epoch + 1))
+            tqdm_batch = tqdm(self.val_loader, total=self.valid_iterations)
             self.model.eval()
             id2mIOU = []
             for x, y, id in tqdm_batch:
@@ -264,6 +212,8 @@ class resultEvaluater(object):
                                         format(id.stem, PA, MPA, MIoU, FWIoU)
                     # print('picInfo', base_out_str)
 
+                    # print('inv_image_size',inv_preprocess(x.clone().cpu(), self.args.show_num_images,
+                    #                             numpy_transform=self.args.numpy_transform).size())
                     images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images,
                                                 numpy_transform=self.args.numpy_transform).squeeze(0).permute(1,2,0)
                     images_inv_np = images_inv.numpy()*255
@@ -271,7 +221,7 @@ class resultEvaluater(object):
                     images_inv_np = Image.fromarray(np.uint8(images_inv_np))
                     labels_colors, label_img = decode_labels(label, self.args.show_num_images)
                     preds_colors, pred_img = decode_labels(argpred, self.args.show_num_images)
-                    # print('save images to', outputPath)
+                    print('save images to', outputPath)
                     label_img.save(os.path.join(outputPath, base_out_str + 'label_img.png'))
                     pred_img.save(os.path.join(outputPath, base_out_str + 'pred_img.png'))
                     images_inv_np.save(os.path.join(outputPath, base_out_str + 'style_img.png'))

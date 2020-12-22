@@ -39,28 +39,49 @@ label_colours = [
         [  0,   0,   0]] # the color of ignored label(-1) 
 label_colours = list(map(tuple, label_colours))
 
-name_classes = [
-    'road',
-    'sidewalk',
-    'building',
-    'wall',
-    'fence',
-    'pole',
-    'trafflight',
-    'traffsign',
-    'vegetation',
-    'terrain',
-    'sky',
-    'person',
-    'rider',
-    'car',
-    'truck',
-    'bus',
-    'train',
-    'motorcycle',
-    'bicycle',
-    'unlabeled'
-]
+
+class Client_dataset(data.Dataset):
+    def __init__(self, dataset_path, args):
+        self.args = args
+        self.dataset_path = dataset_path
+        self.resize = self.args.resize
+        item_list_path = os.path.join(dataset_path['list_path'], 'test.txt')
+
+        self.items = [itemid.strip() for itemid in open(item_list_path)]
+
+    def __getitem__(self, item):
+        image_path = self.items[item]
+        image = Image.open(image_path).convert("RGB")
+
+        return self._val_sync_transform(image)
+
+    def __len__(self):
+        return len(self.items)
+
+    def _val_sync_transform(self, img):
+        if self.resize:
+            img = img.resize(self.args.seg_size, Image.BICUBIC)
+
+        # final transform
+        img = self._img_transform(img)
+
+        return img
+
+    def _img_transform(self, image):
+        if self.args.numpy_transform:
+            image = np.asarray(image, np.float32)
+            image = image[:, :, ::-1]  # change to gbr
+            image -= IMG_MEAN
+            image = image.transpose((2, 0, 1)).copy() # (C x H x W)
+            new_image = torch.from_numpy(image)
+        else:
+            image_transforms = ttransforms.Compose([
+                ttransforms.ToTensor(),
+                ttransforms.Normalize([.485, .456, .406], [.229, .224, .225]),
+            ])
+            new_image = image_transforms(image)
+        return new_image
+
 
 class City_Dataset(data.Dataset):
     def __init__(self,
@@ -69,26 +90,16 @@ class City_Dataset(data.Dataset):
                  list_path=os.path.abspath('./datasets/city_list'),
                  gt_path=None,
                  split='train',
-                 base_size=769,
-                 crop_size=769,
                  training=True,
                  class_16=False,
                  class_13=False):
-        """
-
-        :param root_path:
-        :param dataset:
-        :param base_size:
-        :param is_trainging:
-        :param transforms:
-        """
         self.args = args
         self.data_path=data_root_path
         self.list_path=list_path
         self.gt_path =gt_path
-        self.split=split
-        self.base_size=base_size
-        self.crop_size=crop_size
+        self.split = split
+        self.base_size = self.args.base_size
+        self.crop_size = self.args.crop_size
 
         self.base_size = self.base_size if isinstance(self.base_size, tuple) else (self.base_size, self.base_size)
         self.crop_size = self.crop_size if isinstance(self.crop_size, tuple) else (self.crop_size, self.crop_size)
@@ -97,14 +108,16 @@ class City_Dataset(data.Dataset):
         self.random_mirror = args.random_mirror
         self.random_crop = args.random_crop
         self.resize = args.resize
-        self.gaussian_blur = args.gaussian_blur
+        if not self.args.DA:
+            self.rsize = self.args.seg_size
+        else:
+            self.rsize = self.base_size
 
-        item_list_filepath = os.path.join(self.list_path, self.split+".txt")
+        if 'train' in self.split:
+            item_list_filepath = os.path.join(self.list_path, 'train'+".txt")
+        elif "val" in self.split:
+            item_list_filepath = os.path.join(self.list_path, 'val'+".txt")
 
-        # self.image_filepath = os.path.join(self.data_path, "leftImg8bit")
-
-        # self.gt_filepath = os.path.join(self.data_path, "gtFine")
-        # print("item_list_filepath",item_list_filepath)
         self.items = [id.strip() for id in open(item_list_filepath)]
 
         ignore_label = -1
@@ -123,9 +136,7 @@ class City_Dataset(data.Dataset):
         synthia_set_13 = [0, 1, 2, 6, 7, 8, 10, 11, 12, 13, 15, 17, 18]
         self.trainid_to_13id = {id:i for i,id in enumerate(synthia_set_13)}
         
-        print("{} num images in Cityscapes {} set have been loaded.".format(len(self.items), self.split))
-        if self.args.numpy_transform:
-            print("use numpy_transform, instead of tensor transform!")
+        # print("{} num images in Cityscapes {} set have been loaded.".format(len(self.items), self.split))
 
     def id2trainId(self, label, reverse=False, ignore_label=-1):
         label_copy = ignore_label * np.ones(label.shape, dtype=np.float32)
@@ -145,26 +156,19 @@ class City_Dataset(data.Dataset):
 
     def __getitem__(self, item):
         id = self.items[item]
-        # filename = id.split("train_")[-1].split("val_")[-1].split("test_")[-1]
-        # image_filepath = os.path.join(self.image_filepath, id.split("_")[0], id.split("_")[1])
-        # image_filename = filename + "_leftImg8bit.png"
-        # image_path = os.path.join(image_filepath, image_filename)
-        # print("self.data_path,id",self.data_path,id)
-        image_path = os.path.join(self.data_path,id)
+        image_path = os.path.join(self.data_path, id)
         image = Image.open(image_path).convert("RGB")
 
-        # print("self.gt_path",self.gt_path)
         gt_image_path = self.gt_path+id.replace("leftImg8bit","",1)\
                                      .replace("leftImg8bit","gtFine_labelIds")
-        # print("gt_image_path",gt_image_path)
         gt_image = Image.open(gt_image_path)
 
-        if (self.split == "train" or self.split == "trainval") and self.training:
-            image, gt_image = self._train_sync_transform(image, gt_image)
+        if ("train" in self.split or "trainval" in self.split) and self.training:
+            image_tf, gt_image = self._train_sync_transform(image, gt_image)
         else:
-            image, gt_image = self._val_sync_transform(image, gt_image)
+            image_tf, gt_image = self._val_sync_transform(image, gt_image)
 
-        return image, gt_image, id
+        return image_tf, gt_image, item
 
     def _train_sync_transform(self, img, mask):
         '''
@@ -177,85 +181,71 @@ class City_Dataset(data.Dataset):
             if random.random() < 0.5:
                 img = img.transpose(Image.FLIP_LEFT_RIGHT)
                 if mask: mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
-            crop_w, crop_h = self.crop_size
 
+        # crop and resize to base_size
         if self.random_crop:
-            # random scale
-            base_w , base_h = self.base_size
-            w, h = img.size
-            assert w >= h
-            if (base_w / w) > (base_h / h):
-                base_size = base_w 
-                short_size = random.randint(int(base_size * 0.5), int(base_size * 2.0))
-                ow = short_size
-                oh = int(1.0 * h * ow / w)
-            else:
-                base_size = base_h
-                short_size = random.randint(int(base_size * 0.5), int(base_size * 2.0))
-                oh = short_size
-                ow = int(1.0 * w * oh / h)
-
-            img = img.resize((ow, oh), Image.BICUBIC)
-            if mask: mask = mask.resize((ow, oh), Image.NEAREST)
-            # pad crop
-            if ow < crop_w or oh < crop_h:
-                padh = crop_h - oh if oh < crop_h else 0
-                padw = crop_w - ow if ow < crop_w else 0
-                img = ImageOps.expand(img, border=(0, 0, padw, padh), fill=0)
-                if mask: mask = ImageOps.expand(mask, border=(0, 0, padw, padh), fill=0)
+            crop_w, crop_h = self.crop_size
             # random crop crop_size
             w, h = img.size
             x1 = random.randint(0, w - crop_w)
             y1 = random.randint(0, h - crop_h)
             img = img.crop((x1, y1, x1 + crop_w, y1 + crop_h))
-            if mask: mask = mask.crop((x1, y1, x1 + crop_w, y1 + crop_h))
-        elif self.resize:
-            img = img.resize(self.crop_size, Image.BICUBIC)
-            if mask: mask = mask.resize(self.crop_size, Image.NEAREST)
-        
-        if self.gaussian_blur:
-            # gaussian blur as in PSP
-            if random.random() < 0.5:
-                img = img.filter(ImageFilter.GaussianBlur(
-                    radius=random.random()))
+            img = img.resize(self.base_size, Image.BICUBIC)
+            if mask:
+                mask = mask.crop((x1, y1, x1 + crop_w, y1 + crop_h))
+                mask = mask.resize(self.base_size, Image.NEAREST)
+
+        # resize to the base_size
+        if self.resize:
+            img = img.resize(self.rsize, Image.BICUBIC)
+            if mask: mask = mask.resize(self.rsize, Image.NEAREST)
+
+
         # final transform
-        if mask: 
-            img, mask = self._img_transform(img), self._mask_transform(mask)
-            return img, mask
+        if self.args.DA:
+            img = ttransforms.ToTensor()(img)
         else:
             img = self._img_transform(img)
+        if mask:
+            mask = self._mask_transform(mask) # array,idmatch,tensor
+            return img, mask
+        else:
             return img
 
     def _val_sync_transform(self, img, mask):
+        if self.resize:
+            img = img.resize(self.rsize, Image.BICUBIC)
+            if mask:
+                mask = mask.resize(self.rsize, Image.NEAREST)
+
         if self.random_crop:
             crop_w, crop_h = self.crop_size
+            # random crop crop_size
             w, h = img.size
-            if crop_w / w < crop_h / h:
-                oh = crop_h
-                ow = int(1.0 * w * oh / h)
-            else:
-                ow = crop_w
-                oh = int(1.0 * h * ow / w)
-            img = img.resize((ow, oh), Image.BICUBIC)
-            mask = mask.resize((ow, oh), Image.NEAREST)
-            # center crop
-            w, h = img.size
-            x1 = int(round((w - crop_w) / 2.))
-            y1 = int(round((h - crop_h) / 2.))
+            x1 = random.randint(0, w - crop_w)
+            y1 = random.randint(0, h - crop_h)
             img = img.crop((x1, y1, x1 + crop_w, y1 + crop_h))
-            mask = mask.crop((x1, y1, x1 + crop_w, y1 + crop_h))
-        elif self.resize:
-            img = img.resize(self.crop_size, Image.BICUBIC)
-            mask = mask.resize(self.crop_size, Image.NEAREST)
+            img = img.resize(self.base_size, Image.BICUBIC)
+            if mask:
+                mask = mask.crop((x1, y1, x1 + crop_w, y1 + crop_h))
+                mask = mask.resize(self.base_size, Image.NEAREST)
 
         # final transform
-        img, mask = self._img_transform(img), self._mask_transform(mask)
-        return img, mask
+        # img = self._img_transform(img)
+        if self.args.DA:
+            img = ttransforms.ToTensor()(img)
+        else:
+            img = self._img_transform(img)
+        if mask:
+            mask = self._mask_transform(mask)
+            return img, mask
+        else:
+            return img
 
     def _img_transform(self, image):
         if self.args.numpy_transform:
             image = np.asarray(image, np.float32)
-            image = image[:, :, ::-1]  # change to BGR
+            image = image[:, :, ::-1]  # change to gbr
             image -= IMG_MEAN
             image = image.transpose((2, 0, 1)).copy() # (C x H x W)
             new_image = torch.from_numpy(image)
@@ -274,6 +264,17 @@ class City_Dataset(data.Dataset):
 
         return target
 
+    def adain_transform(self,size):
+        from torchvision import transforms
+        base_size = (size[1],size[0])
+        # crop_size = (self.crop_size[1],self.crop_size[0])
+        transform_list = [
+            transforms.Resize(size=base_size),  # (h,w) 512, 1024
+            # transforms.RandomCrop(crop_size),
+            transforms.ToTensor()
+        ]
+        return transforms.Compose(transform_list)
+
     def __len__(self):
         return len(self.items)
 
@@ -283,49 +284,42 @@ class City_DataLoader():
         self.args = args
 
         data_set = City_Dataset(args, 
-                                data_root_path=datasets_path['data_root_path'],
-                                list_path=datasets_path['list_path'],
-                                gt_path=datasets_path['gt_path'],
+                                data_root_path=datasets_path['Cityscapes']['data_root_path'],
+                                list_path=datasets_path['Cityscapes']['list_path'],
+                                gt_path=datasets_path['Cityscapes']['gt_path'],
                                 split=args.split,
-                                base_size=args.base_size,
-                                crop_size=args.crop_size,
                                 training=training,
                                 class_16=args.class_16,
                                 class_13=args.class_13)
 
-        if (self.args.split == "train" or self.args.split == "trainval") and training:
-            self.data_loader = data.DataLoader(data_set,
-                                               batch_size=self.args.batch_size,
-                                               shuffle=True,
-                                               num_workers=self.args.data_loader_workers,
-                                               pin_memory=self.args.pin_memory,
-                                               drop_last=True)
+        self.data_loader = data.DataLoader(data_set,
+                                           batch_size=self.args.batch_size,
+                                           shuffle=True,
+                                           num_workers=self.args.data_loader_workers,
+                                           pin_memory=self.args.pin_memory,
+                                           drop_last=True)
+
+        if not self.args.client:
+            val_set = City_Dataset(args,
+                                   data_root_path=datasets_path['Cityscapes']['data_root_path'],
+                                   list_path=datasets_path['Cityscapes']['list_path'],
+                                   gt_path=datasets_path['Cityscapes']['gt_path'],
+                                   split='val',
+                                   training=False,
+                                   class_16=args.class_16,
+                                   class_13=args.class_13)
         else:
-            self.data_loader = data.DataLoader(data_set,
-                                               batch_size=self.args.batch_size,
-                                               shuffle=False,
-                                               num_workers=self.args.data_loader_workers,
-                                               pin_memory=self.args.pin_memory,
-                                               drop_last=True)
+            val_set = Client_dataset(datasets_path['Client'], self.args)
 
-        val_set = City_Dataset(args,
-                               data_root_path=datasets_path['data_root_path'],
-                               list_path=datasets_path['list_path'],
-                               gt_path=datasets_path['gt_path'],
-                                split='val',
-                                base_size=args.base_size,
-                                crop_size=args.crop_size,
-                                training=False,
-                                class_16=args.class_16,
-                                class_13=args.class_13)
         self.val_loader = data.DataLoader(val_set,
-                                            batch_size=self.args.batch_size,
-                                            shuffle=False,
-                                            num_workers=self.args.data_loader_workers,
-                                            pin_memory=self.args.pin_memory,
-                                            drop_last=True)
-        self.valid_iterations = (len(val_set) + self.args.batch_size) // self.args.batch_size
+                                         batch_size=self.args.batch_size,
+                                         shuffle=False,
+                                         num_workers=self.args.data_loader_workers,
+                                         pin_memory=self.args.pin_memory,
+                                         drop_last=True)
 
+
+        self.valid_iterations = (len(val_set) + self.args.batch_size) // self.args.batch_size
         self.num_iterations = (len(data_set) + self.args.batch_size) // self.args.batch_size
 
 def flip(x, dim):
@@ -349,7 +343,7 @@ def inv_preprocess(imgs, num_images=1, img_mean=IMG_MEAN, numpy_transform=False)
     """
     if numpy_transform:
         imgs = flip(imgs, 1)
-    def norm_ip(img, min, max):
+    def norm_ip(img, min, max):  ## 图像归一化
         img.clamp_(min=min, max=max)
         img.add_(-min).div_(max - min + 1e-5)
     norm_ip(imgs, float(imgs.min()), float(imgs.max()))
@@ -378,11 +372,32 @@ def decode_labels(mask, num_images=1, num_classes=NUM_CLASSES):
       for j_, j in enumerate(mask[i, :, :]):
           for k_, k in enumerate(j):
               if k < num_classes:
-                  pixels[k_,j_] = label_colours[k]
+                  pixels[int(k_),int(j_)] = label_colours[int(k)]
       outputs[i] = np.array(img)
-    return torch.from_numpy(outputs.transpose([0, 3, 1, 2]).astype('float32')).div_(255.0),img
+    return torch.from_numpy(outputs.transpose([0, 3, 1, 2]).astype('float32')).div_(255.0)
     
-
+name_classes = [
+    'road',
+    'sidewalk',
+    'building',
+    'wall',
+    'fence',
+    'pole',
+    'trafflight',
+    'traffsign',
+    'vegetation',
+    'terrain',
+    'sky',
+    'person',
+    'rider',
+    'car',
+    'truck',
+    'bus',
+    'train',
+    'motorcycle',
+    'bicycle',
+    'unlabeled'
+]
 
 def inspect_decode_labels(pred, num_images=1, num_classes=NUM_CLASSES, 
         inspect_split=[0.9, 0.8, 0.7, 0.5, 0.0], inspect_ratio=[1.0, 0.8, 0.6, 0.3]):

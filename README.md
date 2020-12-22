@@ -11,12 +11,11 @@ A **PyTorch** implementation for our ICCV 2019 paper ["Domain Adaptation for Sem
 If you use this code in your research, please cite:
 
 ```
-@InProceedings{Chen_2019_ICCV,
-author = {Chen, Minghao and Xue, Hongyang and Cai, Deng},
-title = {Domain Adaptation for Semantic Segmentation With Maximum Squares Loss},
-booktitle = {The IEEE International Conference on Computer Vision (ICCV)},
-month = {October},
-year = {2019}
+@inproceedings{maxsquareloss,
+  title={Domain Adaptation for Semantic Segmentation with Maximum Squares Loss},
+  author={Minghao Chen, Hongyang Xue and Deng Cai},
+  booktitle={IEEE International Conference on Computer Vision(ICCV)},
+  year={2019}
 }
 ```
 
@@ -102,13 +101,13 @@ We present several transfered results reported in our paper and provide the corr
 
 
 ```
-rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/train_source.py --gpu "0" --dataset 'gta5' --checkpoint_dir "./log/gta5_pretrain/" --iter_max 200000 --iter_stop 80000 --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --crop_size "1280,640"
+rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/train_source.py --gpu "0" --dataset 'gta5' --checkpoint_dir "./log/gta5_pretrain/" --iter_max 200000 --iter_stop 80000 --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --crop_size "1280,720"
 ```
 
 Pretrain the multi-level model on the source domain (GTA5) by adding "--multi True". 
 
 ```
-rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/train_source.py --gpu "0" --dataset 'gta5' --checkpoint_dir "./log/train/add_multi" --iter_max 200000 --iter_stop 80000 --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --crop_size "1280,640" --multi True
+rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/train_source.py --gpu "0" --dataset 'gta5' --checkpoint_dir "./log/train/add_multi" --iter_max 200000 --iter_stop 80000 --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --crop_size "1280,720" --multi True
 ```
 
 Otherwise, download the [checkpoint](https://drive.google.com/open?id=1KP37cQo_9NEBczm7pvq_zEmmosdhxvlF) pretrained on GTA5 in "Setup" section.
@@ -139,8 +138,6 @@ rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --gpu "0"
 
 ```
 rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --gpu "0" --backbone "deeplabv2_multi" --dataset 'cityscapes' --exp IW_MS_repeat --restore_id add_multi --checkpoint_dir "./log/train/add_multi_gta_only" --save_dir "./log/train/add_multi_gta_only/multi_MS_IW_repeat"  --round_num 15 --target_mode "IW_maxsquare" --freeze_bn False --weight_decay 5e-4 --lr 2.5e-4 --target_crop_size "1280,640" --lambda_target 0.09 --IW_ratio 0.2 --multi True --lambda_seg 0.1 --threshold 0.95
-short version:
-rlaunch --gpu=1 --cpu=10 --memory=10000 -- python3 tools/solve_gta5.py --exp IW_MS_target_solo --restore_id add_multi --checkpoint_dir "./log/train/add_multi_gta_only" --save_dir "./log/train/add_multi_gta_only/multi_MS_IW_target_solo"  --round_num 20 --target_mode "IW_maxsquare" --lambda_target 0.09 --multi True
 ```
 ##### if your want to continue training 
 Set`"--continue_training True"` and change the init lr same as where it ends in `"--lr"`

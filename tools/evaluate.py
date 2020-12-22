@@ -63,15 +63,12 @@ class Evaluater():
 
         # dataloader
         # print("args.data_root_path",args.data_root_path,self.args.list_path)
-        self.dataloader = City_DataLoader(self.args,datasets_path=datasets_path['Cityscapes_ambulance_gta5pcity_retrain_alpha1stylewt1']) \
-                            if self.args.dataset=="cityscapes" else GTA5_DataLoader(self.args,datasets_path=datasets_path[self.args.dataset])
+        self.dataloader = City_DataLoader(self.args) if self.args.dataset=="cityscapes" else GTA5_DataLoader(self.args)
         if self.args.city_name != "None":
             target_data_set = CrossCity_Dataset(self.args, 
                                     data_root_path=self.args.data_root_path,
                                     list_path=self.args.list_path,
                                     split='val',
-                                    base_size=self.args.target_base_size,
-                                    crop_size=self.args.target_crop_size,
                                     class_13=self.args.class_13)
             self.target_val_dataloader = data.DataLoader(target_data_set,
                                                 batch_size=self.args.batch_size,
@@ -105,10 +102,8 @@ class Evaluater():
         with torch.no_grad():
             tqdm_batch = tqdm(self.dataloader.val_loader, total=self.dataloader.valid_iterations,
                               desc="Val Epoch-{}-".format(self.current_epoch + 1))
-            val_loss = []
             self.model.eval()
             i = 0
-            count = 0
 
             for x, y, id in tqdm_batch:
                 i += 1
@@ -151,8 +146,8 @@ class Evaluater():
                 if i % 20 ==0 and self.args.image_summary:
                     #show val result on tensorboard
                     images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images, numpy_transform=self.args.numpy_transform)
-                    labels_colors,_ = decode_labels(label, self.args.show_num_images)
-                    preds_colors,_  = decode_labels(argpred, self.args.show_num_images)
+                    labels_colors = decode_labels(label, self.args.show_num_images)
+                    preds_colors = decode_labels(argpred, self.args.show_num_images)
                     for index, (img, lab, color_pred) in enumerate(zip(images_inv, labels_colors, preds_colors)):
                         self.writer.add_image('eval/'+ str(index)+'/Images', img, self.current_epoch)
                         self.writer.add_image('eval/'+ str(index)+'/Labels', lab, self.current_epoch)
@@ -161,8 +156,8 @@ class Evaluater():
             #show val result on tensorboard
             if self.args.image_summary:
                 images_inv = inv_preprocess(x.clone().cpu(), self.args.show_num_images, numpy_transform=self.args.numpy_transform)
-                labels_colors,_  = decode_labels(label, self.args.show_num_images)
-                preds_colors,_  = decode_labels(argpred, self.args.show_num_images)
+                labels_colors = decode_labels(label, self.args.show_num_images)
+                preds_colors = decode_labels(argpred, self.args.show_num_images)
                 for index, (img, lab, color_pred) in enumerate(zip(images_inv, labels_colors, preds_colors)):
                     self.writer.add_image('0Images/'+str(index), img, self.current_epoch)
                     self.writer.add_image('a'+str(index)+'/Labels', lab, self.current_epoch)
@@ -190,7 +185,7 @@ class Evaluater():
                 def val_info(Eval, name):
                     PA = Eval.Pixel_Accuracy()
                     MPA = Eval.Mean_Pixel_Accuracy()
-                    MIoU,_ = Eval.Mean_Intersection_over_Union()
+                    MIoU = Eval.Mean_Intersection_over_Union()
                     FWIoU = Eval.Frequency_Weighted_Intersection_over_Union()
                     PC = Eval.Mean_Precision()
                     print("########## Eval{} ############".format(name))
@@ -240,7 +235,7 @@ if __name__ == '__main__':
                             help="image_summary")
 
     args = arg_parser.parse_args()
-    if args.split == "train": args.split = "val"
+    if "train" in args.split: args.split = "val"
     if args.checkpoint_dir == "none": args.checkpoint_dir = args.pretrained_ckpt_file + "/eval"
     args, train_id, logger = init_args(args)
     args.batch_size_per_gpu = 2

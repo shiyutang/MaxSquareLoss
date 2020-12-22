@@ -62,7 +62,7 @@ class SYNTHIA_Dataset(City_Dataset):
         self.trainid_to_16id = {id:i for i,id in enumerate(synthia_set_16)}
         self.class_13 = False
 
-        print("{} num images in GTA5 {} set have been loaded.".format(len(self.items), self.split))
+        # print("{} num images in GTA5 {} set have been loaded.".format(len(self.items), self.split))
 
     def __getitem__(self, item):
         id = int(self.items[item])
@@ -94,7 +94,7 @@ class SYNTHIA_DataLoader():
                                 crop_size=args.crop_size,
                                 training=training)
 
-        if self.args.split == "train" or self.args.split == "trainval" or self.args.split =="all":
+        if "train"  in self.args.split:
             self.data_loader = data.DataLoader(data_set,
                                                batch_size=self.args.batch_size,
                                                shuffle=True,
